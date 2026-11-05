@@ -7,32 +7,55 @@
  */
 import { type Config, GitHub, HttpError } from './github'
 import * as idb from './idb'
-import {
-  addTodo, appendNote, deleteTodo, emptyTodo, moveTodo, newDay, setMeta, setSection, toggleTodo,
-  type TodoSection,
-} from './md'
+import { appendNote, newDay, setMeta, setSection } from './md'
+import * as T from './todo'
 
 export type OpArgs =
   | { kind: 'note'; date: string; time: string; text: string }
   | { kind: 'meta'; date: string; key: string; value: string }
   | { kind: 'journal'; date: string; text: string }
-  | { kind: 'todo.add'; text: string; section: TodoSection }
+  | { kind: 'task.add'; text: string; group: string; date: string }
+  | { kind: 'task.toggle'; key: string; group?: string; today: string }
+  | { kind: 'task.date'; key: string; group?: string; date: string }
+  | { kind: 'task.edit'; key: string; group?: string; text: string }
+  | { kind: 'task.move'; key: string; group?: string; to: string }
+  | { kind: 'task.delete'; key: string; group?: string }
+  | { kind: 'project.add'; name: string; goal: string }
+  | { kind: 'project.rename'; from: string; to: string }
+  | { kind: 'project.goal'; name: string; goal: string }
+  | { kind: 'project.delete'; name: string }
+  | { kind: 'todo.migrate' }
+  // v1 留在手机队列里、尚未同步的旧操作
+  | { kind: 'todo.add'; text: string; section: string }
   | { kind: 'todo.toggle'; key: string; today: string }
-  | { kind: 'todo.move'; key: string; section: TodoSection }
+  | { kind: 'todo.move'; key: string; section: string }
   | { kind: 'todo.delete'; key: string }
   | { kind: 'write'; content: string; label: string }
 
 export type Op = OpArgs & { id: string; path: string }
+
+const legacyGroup = (s: string) => (s === '之后' ? T.SOMEDAY : T.INBOX)
 
 export function applyOp(c: string | null, op: OpArgs): string {
   switch (op.kind) {
     case 'note': return appendNote(c ?? newDay(op.date), op.time, op.text)
     case 'meta': return setMeta(c ?? newDay(op.date), op.key, op.value)
     case 'journal': return setSection(c ?? newDay(op.date), '日记', op.text)
-    case 'todo.add': return addTodo(c ?? emptyTodo(), op.text, op.section)
-    case 'todo.toggle': return toggleTodo(c ?? emptyTodo(), op.key, op.today)
-    case 'todo.move': return moveTodo(c ?? emptyTodo(), op.key, op.section)
-    case 'todo.delete': return deleteTodo(c ?? emptyTodo(), op.key)
+    case 'task.add': return T.addTask(c, op.text, op.group, op.date)
+    case 'task.toggle': return T.toggleTask(c, op.key, op.today, op.group)
+    case 'task.date': return T.setTaskDate(c, op.key, op.date, op.group)
+    case 'task.edit': return T.editTask(c, op.key, op.text, op.group)
+    case 'task.move': return T.moveTask(c, op.key, op.to, op.group)
+    case 'task.delete': return T.deleteTask(c, op.key, op.group)
+    case 'project.add': return T.addProject(c, op.name, op.goal)
+    case 'project.rename': return T.renameProject(c, op.from, op.to)
+    case 'project.goal': return T.setProjectGoal(c, op.name, op.goal)
+    case 'project.delete': return T.deleteProject(c, op.name)
+    case 'todo.migrate': return T.migrateTodo(c ?? T.emptyTodo())
+    case 'todo.add': return T.addTask(c, op.text, legacyGroup(op.section))
+    case 'todo.toggle': return T.toggleTask(c, op.key, op.today)
+    case 'todo.move': return T.moveTask(c, op.key, legacyGroup(op.section))
+    case 'todo.delete': return T.deleteTask(c, op.key)
     case 'write': return op.content
   }
 }
@@ -50,7 +73,8 @@ function label(op: Op): string {
     case 'meta': return `状态 ${op.date}`
     case 'journal': return `日记 ${op.date}`
     case 'write': return op.label
-    default: return '待办'
+    case 'todo.migrate': return '待办：升级格式'
+    default: return op.kind.startsWith('project') ? '项目' : '待办'
   }
 }
 
@@ -181,6 +205,10 @@ class Store {
 
   pendingCount() {
     return this.pending.length
+  }
+
+  hasPending(path: string, kind?: OpArgs['kind']) {
+    return this.pending.some((o) => o.path === path && (!kind || o.kind === kind))
   }
 
   /** 从远端拉取单个文件的最新版本 */

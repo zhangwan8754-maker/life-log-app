@@ -1,20 +1,5 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`待办 > 新增 / 完成 / 撤销 / 移动 / 删除 1`] = `
-"# 待办
-
-## 现在
-
-- [ ] 跑步
-- [ ] 学钢琴
-
-## 之后
-
-## 完成
-
-"
-`;
-
 exports[`每日文件 > 新建 → 写日记 → 速记，往返不丢内容 1`] = `
 "---
 date: 2026-11-05

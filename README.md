@@ -1,53 +1,81 @@
 # Life Log · App
 
-读写 `life-log` 数据仓库的网页前端（PWA）。纯静态、无后端：浏览器直接用你自己的 GitHub 令牌读写仓库里的 Markdown。网页本身不包含任何日记数据。
+Life Log 的网页前端（PWA），读写你**私有**的 `life-log` 数据仓库。
 
-## 四个页面
+- 纯静态，没有后端：浏览器直接用你自己的 GitHub 令牌读写仓库里的 Markdown。
+- 本仓库只有代码，不含任何记录。
 
-| 页面 | 做什么 | 写到哪 |
-|---|---|---|
-| 今天 | 情绪 / 精力打分、日记、速记（可翻到任意一天） | `days/YYYY/YYYY-MM-DD.md` |
-| 待办 | 现在 / 之后 / 完成，勾选、移动、删除 | `todo.md` |
-| 思想 | 卡片列表与编辑；速记旁的 ↗ 可一键提炼 | `thoughts/<标题>.md` |
-| 回看 | 年度热力图、近 30 天曲线、全文搜索、复盘、我是谁 | 只读（`me.md` 可编辑） |
+## 四个分区
 
-底部的速记框在任何页面都能用（桌面按 `/` 聚焦）：回车记入今天；以 `[]` 开头则加入待办。
+| 分区 | 做什么 |
+|---|---|
+| **今天** | 今天要做（含逾期）、情绪 / 精力打分、日记、速记。可以翻到任意一天 |
+| **计划** | 日程：收件箱、逾期、未来 14 天、以后。项目：进度、目标、下一步。还有「将来」清单 |
+| **笔记** | 第二大脑：思想卡片、按标签筛选、全部速记流、全文搜索 |
+| **复盘** | 每周复盘流程（回顾 → 清理 → 反思 → 计划）、本周数据、30 天趋势、年度热力图、复制给 AI、我是谁 |
 
-## 同步是怎么做的
+**操作**
+- 任何页面点右下角 **＋**（桌面按 `/`）：新建待办（可选日期和项目）、速记或日记。
+- 任务**右滑完成、左滑改期**，点开可以改文字、排日期、移到别的项目、删除。完成和删除都可以撤销。
 
-每次修改都是一个**可重放的操作**（追加一条速记、把 mood 设为 7、勾选某条待办……），先存进本机队列，再在联网时：取远端最新版本 → 重放 → 提交。所以：
+## 数据格式
 
-- **离线可记**：没网时照常写，联网（或回到页面）后自动提交。
-- **多设备不覆盖**：手机和电脑同时改同一天，两边的内容都会保留。
-- 内容按 git sha 缓存在 IndexedDB，打开即显示，只下载变化的文件。
+所有记录都在数据仓库里，`AGENTS.md` 有完整说明。待办的格式：
 
-## 部署到 GitHub Pages
+```markdown
+## 收件箱
+- [ ] 买牛奶 @2026-11-06          ← @日期 = 计划哪天做
+## 读书计划                      ← 其余任何 ## 标题都是一个项目
+> 今年读完 24 本                 ← 可选：项目目标
+- [x] 读完《人类简史》 ✓2026-11-01 ← 完成后留在原项目里
+## 将来
+```
 
-免费账号的 Pages 需要公开仓库，而你的数据仓库应保持私有，所以把 app 放进一个**单独的公开仓库**（里面只有代码，没有任何记录）：
+旧版的 `现在 / 之后 / 完成` 格式，在第一次打开新版时会自动升级。
 
-1. 在 GitHub 新建公开仓库，例如 `life-log-app`。
-2. 把本目录 `app/` 下的所有文件（含 `.github/`）放到新仓库根目录，推送到 `main`。
-3. 新仓库 → Settings → Pages → Source 选 **GitHub Actions**。
-4. 推送后约 1 分钟，访问 `https://<用户名>.github.io/life-log-app/`。
+## 同步机制
+
+每次修改都是一个**可重放的操作**，比如追加速记、设置 mood、勾选某条待办。修改先存进本机队列；联网时取远端最新版本，把队列里的操作重放上去，再提交。因此：
+
+- **离线也能记**，联网后自动提交。
+- **多设备同时改不会互相覆盖。**
+- 内容按 git sha 缓存在 IndexedDB 里，打开就能看到，之后只下载有变化的文件。
+
+## 部署
+
+推送到 `main` 后，GitHub Actions 会自动测试、构建，并发布到 GitHub Pages（Settings → Pages → Source 选 GitHub Actions）。
 
 ## 首次使用
 
-1. 打开 [新建 fine-grained token](https://github.com/settings/personal-access-tokens/new)：
-   - Repository access → **Only select repositories** → 选 `life-log`
-   - Permissions → Repository → **Contents: Read and write**
-   - 过期时间按需设置（过期后在「回看 → 设置」里换新的即可）
-2. 打开网页，填用户名、仓库名 `life-log`、令牌。令牌只存在这台设备的浏览器里。
-3. 手机上：Safari 分享 → **添加到主屏幕**（Android Chrome：菜单 → 安装应用），之后就像原生 App 一样全屏打开。
+1. [新建 fine-grained token](https://github.com/settings/personal-access-tokens/new)：
+   - Repository access 只选 `life-log`
+   - Contents 设为 **Read and write**
+2. 打开网页，填用户名、仓库名和令牌。令牌只存在这台设备上。
+3. 安卓：Chrome 菜单 →「安装应用」。iPhone：Safari 分享 →「添加到主屏幕」。
 
 ## 开发
 
 ```bash
 npm install
-npm run dev        # 本地开发
-npm test           # Markdown 解析单元测试（会读取仓库里的真实文件）
+npm run dev
+npm test               # 单元测试：待办模型、迁移、复盘统计、Markdown 读写
 npm run build
-npm run e2e        # 端到端测试：真实浏览器 + 内存版假 GitHub（需全局安装 playwright）
-npm run e2e -- --shots   # 同时生成亮/暗、桌面/手机截图到 tests/shots/
+npm run e2e            # 端到端测试：真实浏览器 + 内存版假 GitHub（需全局安装 playwright）
+npm run e2e -- --shots # 同时生成 Pixel 7 与桌面、亮色与暗色的截图到 tests/shots/
 ```
 
-代码结构：`src/lib/md.ts`（Markdown 约定的纯函数读写）、`src/lib/store.ts`（操作队列与同步）、`src/lib/github.ts`（四个 REST 端点）、`src/views/*`（各页面）。
+### 代码结构
+
+| 位置 | 内容 |
+|---|---|
+| `src/lib/` | 与界面无关的部分 |
+| ├ `todo.ts` | 待办模型与迁移 |
+| ├ `review.ts` | 周统计、复盘文件、AI 提示词 |
+| ├ `md.ts` | 每日文件和思想的读写 |
+| ├ `store.ts` | 操作队列与同步 |
+| └ `github.ts` | REST 客户端 |
+| `src/components/` | 弹层、滑动行、图表、控件 |
+| `src/pages/` | 各页面 |
+| `src/styles/` | `tokens.css`（配色、圆角、动效）和组件样式 |
+
+界面用 Preact + TSX 编写。

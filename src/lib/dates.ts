@@ -48,3 +48,32 @@ export function cnMonthDay(s: string): string {
   const d = parseYmd(s)
   return `${d.getMonth() + 1}月${d.getDate()}日`
 }
+
+const SHORT_WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+export const shortWeekday = (s: string) => SHORT_WD[parseYmd(s).getDay()]
+
+export function daysBetween(a: string, b: string): number {
+  return Math.round((parseYmd(b).getTime() - parseYmd(a).getTime()) / 864e5)
+}
+
+/** 相对今天的叫法：今天 / 明天 / 昨天 / 周五 / 11月20日 */
+export function relDay(date: string, today: string): string {
+  const n = daysBetween(today, date)
+  if (n === 0) return '今天'
+  if (n === 1) return '明天'
+  if (n === -1) return '昨天'
+  if (n > 1 && n < 7) return shortWeekday(date)
+  return cnMonthDay(date)
+}
+
+/** 本周末（周六）；今天已是周末则为今天 */
+export function weekend(today: string): string {
+  const d = parseYmd(today).getDay()
+  return d === 6 || d === 0 ? today : addDays(today, 6 - d)
+}
+
+/** 下周一 */
+export function nextMonday(today: string): string {
+  const d = parseYmd(today).getDay()
+  return addDays(today, ((8 - d) % 7) || 7)
+}

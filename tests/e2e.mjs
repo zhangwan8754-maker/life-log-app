@@ -1,8 +1,7 @@
 // 端到端测试：真实浏览器 + 内存版假 GitHub API。
 // 用法：npm run build && npm run e2e   （加 --shots 生成截图到 tests/shots/）
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync, statSync, mkdirSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { mkdirSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
@@ -10,12 +9,21 @@ import { createRequire } from 'node:module'
 // Playwright 不写进依赖：本地 / CI 用全局安装的即可
 const { chromium, devices } = createRequire(import.meta.url)('playwright')
 
-const ROOT = new URL('../../', import.meta.url).pathname
 const SHOTS = process.argv.includes('--shots')
 const pad = (n) => String(n).padStart(2, '0')
 const ymd = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+const plusDays = (n) => ymd(new Date(Date.now() + n * 864e5))
 const TODAY = ymd()
+const TOMORROW = plusDays(1)
 const DAY_PATH = `days/${TODAY.slice(0, 4)}/${TODAY}.md`
+const isoWeekId = (date) => {
+  const [y, m, d] = date.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d))
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7))
+  const w = Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7)
+  return `${t.getUTCFullYear()}-W${pad(w)}`
+}
+const WEEK = isoWeekId(TODAY)
 
 // ───── 假 GitHub ─────
 
@@ -66,37 +74,23 @@ class FakeGitHub {
   }
 }
 
-// app 单独放在公开仓库时没有数据文件，用这几份最小的样例代替
-const FIXTURES = {
-  'me.md': '---\nupdated: 2026-11-05\n---\n# 我是谁\n\n## 价值观\n<!-- 我真正在乎什么？按优先级排。冲突时选哪个？ -->\n-\n\n## 当前关注\n-\n',
-  'todo.md': '# 待办\n\n## 现在\n\n- [ ] 填写 me.md #life-log\n\n## 之后\n\n## 完成\n',
-  'thoughts/第一性原理.md': '---\ncreated: 2026-11-05\ntags: [方法]\nfrom: 2026-11-05\n---\n# 第一性原理\n\n把问题拆到不能再拆的基本事实，再从这些事实往上重建。\n',
+/** 和 v1 用户手机上一样的数据：旧版待办格式 */
+function seedV1(gh) {
+  gh.write('me.md', '---\nupdated: 2026-11-05\n---\n# 我是谁\n\n## 价值观\n-\n\n## 今年\n- 读完 24 本书\n')
+  gh.write('todo.md', '# 待办\n\n## 现在\n\n- [ ] 填写 me.md #life-log\n\n## 之后\n\n- [ ] 学钢琴\n\n## 完成\n\n- [x] 搭建 life-log ✓2026-11-01\n')
+  gh.write('thoughts/第一性原理.md', '---\ncreated: 2026-11-05\ntags: [方法]\nfrom: 2026-11-05\n---\n# 第一性原理\n\n把问题拆到不能再拆的基本事实，再从这些事实往上重建。\n')
+  gh.write('reviews/_template.md', '# 模板\n')
 }
 
-function seedFromRepo(gh) {
-  if (!existsSync(join(ROOT, 'todo.md'))) {
-    for (const [p, c] of Object.entries(FIXTURES)) gh.write(p, c)
-    return
-  }
-  const walk = (dir) =>
-    readdirSync(dir).flatMap((n) => {
-      const p = join(dir, n)
-      return statSync(p).isDirectory() ? walk(p) : [p]
-    })
-  for (const p of ['me.md', 'todo.md', 'AGENTS.md', ...['days', 'thoughts', 'reviews'].flatMap((d) => walk(join(ROOT, d)).map((f) => relative(ROOT, f)))])
-    if (p.endsWith('.md')) gh.write(p, readFileSync(join(ROOT, p), 'utf8'))
-}
-
-/** 截图用：近 100 天的示例数据 */
+/** 截图用：近 100 天的示例数据 + 新版待办 */
 function seedSample(gh) {
+  seedV1(gh)
   let r = 7
   const rnd = () => ((r = (r * 9301 + 49297) % 233280), r / 233280)
-  const notes = ['散步时想清楚了下周的优先级', '读到一句话：慢即是快', '和朋友聊了很久', '午后有点困', '把复杂问题拆小，立刻轻松很多']
+  const notes = ['散步时想清楚了下周的优先级', '读到一句话：慢即是快', '和朋友聊了很久', '把复杂问题拆小，立刻轻松很多', '午后犯困，下次少吃点']
   for (let i = 100; i >= 1; i--) {
     if (rnd() < 0.18) continue
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const date = ymd(d)
+    const date = plusDays(-i)
     const mood = Math.max(1, Math.min(10, Math.round(6 + Math.sin(i / 9) * 2 + (rnd() - 0.5) * 3)))
     const energy = Math.max(1, Math.min(10, Math.round(mood + (rnd() - 0.5) * 4)))
     gh.write(
@@ -105,22 +99,23 @@ function seedSample(gh) {
     )
   }
   gh.write(
+    DAY_PATH,
+    `---\ndate: ${TODAY}\nmood: 7\nenergy: 6\ntags: []\n---\n## 日记\n\n早上去河边跑了五公里，回来把这周的计划理了一遍。\n\n第一次觉得，记录不是负担，而是和自己对话的方式。\n\n## 速记\n\n- 08:12 把复杂的问题拆成最小的事实\n- 13:40 午饭后散步 20 分钟，下午明显更清醒\n`,
+  )
+  gh.write(
     'todo.md',
-    `# 待办\n\n## 现在\n\n- [ ] 填写 me.md #life-log\n- [ ] 读完《置身事内》 @${ymd(new Date(Date.now() + 3 * 864e5))} #阅读\n- [ ] 给妈妈打电话\n- [ ] 整理上个月的照片 @${ymd(new Date(Date.now() - 864e5))}\n\n## 之后\n\n- [ ] 学一首钢琴曲 #音乐\n- [ ] 规划春节旅行\n\n## 完成\n\n- [x] 搭建 life-log ✓${TODAY}\n`,
+    `# 待办\n\n## 收件箱\n\n- [ ] 给妈妈打电话 @${TODAY}\n- [ ] 整理上个月的照片 @${plusDays(-2)}\n- [ ] 换手机壳\n- [ ] 查一下护照有效期\n- [x] 交房租 @${TODAY} ✓${TODAY}\n\n## 读书计划\n\n> 今年读完 24 本\n- [ ] 读完《置身事内》第 3 章 @${TODAY} #阅读\n- [ ] 写《置身事内》读书笔记 @${plusDays(3)}\n- [ ] 选下一本书\n- [x] 读完《人类简史》 ✓${plusDays(-6)}\n- [x] 读完《原则》 ✓${plusDays(-20)}\n\n## 健身\n\n> 每周 3 次，体脂降到 18%\n- [ ] 跑步 5 公里 @${TOMORROW}\n- [ ] 力量训练 @${plusDays(2)}\n- [x] 办健身卡 ✓${plusDays(-3)}\n\n## 春节旅行\n\n> 带爸妈去一趟云南\n- [ ] 定路线 @${plusDays(8)}\n- [ ] 比价机票\n\n## 将来\n\n- [ ] 学一首钢琴曲\n- [ ] 学做一道新菜\n`,
   )
-  gh.write(
-    'thoughts/慢即是快.md',
-    `---\ncreated: ${ymd(new Date(Date.now() - 5 * 864e5))}\ntags: [方法, 节奏]\nfrom: \n---\n# 慢即是快\n\n急着推进时最容易返工。先花十分钟把问题写清楚，往往比直接动手省下一小时。\n`,
-  )
-  gh.write(
-    'reviews/2026-W44.md',
-    `---\nperiod: 2026-W44\n---\n# 复盘 · 2026-W44\n\n## 事实\n\n- 运动 3 次，读书 4 天\n\n## 数据\n\n情绪均值 6.8，精力均值 6.1\n\n## 模式\n\n睡够 7 小时的第二天，情绪平均高 1.5 分。\n\n## 下一步\n\n- 23:30 前放下手机\n`,
-  )
+  gh.write('thoughts/慢即是快.md', `---\ncreated: ${plusDays(-5)}\ntags: [方法, 节奏]\nfrom: \n---\n# 慢即是快\n\n急着推进时最容易返工。先花十分钟把问题写清楚，往往比直接动手省下一小时。\n`)
+  gh.write('thoughts/能量管理.md', `---\ncreated: ${plusDays(-12)}\ntags: [精力]\nfrom: \n---\n# 能量管理比时间管理更重要\n\n上午的两小时是一天里最清醒的时候，留给最难的事；会议和杂事放到下午。\n`)
 }
 
 // ───── 运行 ─────
 
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', '4319', '--strictPort'], { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' })
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', '4319', '--strictPort'], {
+  cwd: new URL('..', import.meta.url).pathname,
+  stdio: 'pipe',
+})
 await new Promise((res, rej) => {
   server.stdout.on('data', (d) => String(d).includes('4319') && res())
   server.on('exit', rej)
@@ -141,10 +136,10 @@ async function newPage(gh, opts = {}) {
   const ctx = await browser.newContext({ serviceWorkers: 'block', ...opts })
   await ctx.route('https://api.github.com/**', (r) => gh.handle(r))
   const page = await ctx.newPage()
-  page.on('pageerror', (e) => {
-    throw e
-  })
-  return { ctx, page }
+  const errors = []
+  page.on('pageerror', (e) => errors.push(e))
+  page.on('console', (m) => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errors.push(new Error(m.text())))
+  return { ctx, page, errors }
 }
 
 async function connect(page) {
@@ -154,6 +149,17 @@ async function connect(page) {
   await page.fill('input[type=password]', 'test-token')
   await page.click('button[type=submit]')
   await page.waitForURL((u) => u.hash === '#/')
+}
+
+/** 用鼠标模拟滑动一行 */
+async function swipe(page, locator, dx) {
+  const box = await locator.boundingBox()
+  const y = box.y + box.height / 2
+  const x = box.x + box.width / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  for (let i = 1; i <= 8; i++) await page.mouse.move(x + (dx * i) / 8, y + 1)
+  await page.mouse.up()
 }
 
 let passed = 0
@@ -166,146 +172,263 @@ const step = async (name, fn) => {
 try {
   console.log('功能测试')
   const gh = new FakeGitHub()
-  seedFromRepo(gh)
-  const { ctx, page } = await newPage(gh)
-  const capture = page.locator('.capture-input')
+  seedV1(gh)
+  const { ctx, page, errors } = await newPage(gh, { viewport: { width: 420, height: 860 } })
+  const todo = () => gh.read('todo.md') ?? ''
+  const day = () => gh.read(DAY_PATH) ?? ''
+  const fab = page.locator('button.fab')
+  const sheet = page.locator('.sheet-root.shown')
 
   await step('错误令牌给出提示', async () => {
     await page.goto(BASE)
     await page.fill('input[placeholder="GitHub 用户名"]', 'me')
     await page.fill('input[type=password]', 'wrong')
     await page.click('button[type=submit]')
-    await until(async () => (await page.textContent('.settings')).includes('Bad credentials'), '错误提示')
+    await page.getByText('Bad credentials').waitFor()
   })
 
-  await step('连接仓库后进入今天', () => connect(page))
+  await step('连接后进入「今天」，旧版待办自动升级', async () => {
+    await connect(page)
+    await page.locator('.large-title h1', { hasText: '今天' }).waitFor()
+    await until(() => todo().includes('## 收件箱') && !todo().includes('## 现在'), '迁移')
+    assert.equal(todo(), '# 待办\n\n## 收件箱\n\n- [ ] 填写 me.md #life-log\n- [x] 搭建 life-log ✓2026-11-01\n\n## 将来\n\n- [ ] 学钢琴\n')
+    assert.ok(gh.puts.some((p) => p.message === '待办：升级格式'))
+  })
 
-  await step('速记写入当天文件', async () => {
-    await capture.fill('第一条速记')
-    await capture.press('Enter')
+  await step('＋ 新建今天的待办，出现在「今天要做」', async () => {
+    await fab.click()
+    await sheet.locator('.capture-input').fill('写周报')
+    await sheet.locator('.capture-input').press('Enter')
+    await sheet.locator('.added li', { hasText: '写周报' }).waitFor()
+    await sheet.locator('.chip', { hasText: '明天' }).click()
+    await sheet.locator('.capture-input').fill('跑步')
+    await sheet.locator('.capture-input').press('Enter')
+    await page.keyboard.press('Escape')
+    await until(() => todo().includes(`- [ ] 写周报 @${TODAY}`) && todo().includes(`- [ ] 跑步 @${TOMORROW}`), '写入待办')
+    await page.locator('.card', { hasText: '今天要做' }).locator('.task', { hasText: '写周报' }).waitFor()
+    assert.equal(await page.locator('.card', { hasText: '今天要做' }).locator('.task', { hasText: '跑步' }).count(), 0)
+  })
+
+  await step('勾选完成、撤销', async () => {
+    const row = page.locator('.task', { hasText: '写周报' })
+    await row.locator('.check').click()
+    await until(() => todo().includes(`- [x] 写周报 @${TODAY} ✓${TODAY}`), '完成')
+    await page.locator('.ring', { hasText: '1/1' }).waitFor()
+    await page.locator('.toast button', { hasText: '撤销' }).click()
+    await until(() => todo().includes(`- [ ] 写周报 @${TODAY}\n`), '撤销')
+  })
+
+  await step('左滑改期到明天、右滑完成', async () => {
+    await swipe(page, page.locator('.swipe', { hasText: '写周报' }), -160)
+    await sheet.locator('.chip', { hasText: '明天' }).click()
+    await until(() => todo().includes(`- [ ] 写周报 @${TOMORROW}`), '改期')
+    await fab.click()
+    await sheet.locator('.capture-input').fill('倒垃圾')
+    await sheet.locator('.capture-input').press('Enter')
+    await page.keyboard.press('Escape')
+    await page.locator('.swipe', { hasText: '倒垃圾' }).waitFor()
+    await page.waitForTimeout(350)
+    await swipe(page, page.locator('.swipe', { hasText: '倒垃圾' }), 160)
+    await until(() => todo().includes(`- [x] 倒垃圾 @${TODAY} ✓${TODAY}`), '右滑完成')
+  })
+
+  await step('情绪 / 精力打分', async () => {
+    await page.locator('.score-card.mood').click()
+    await sheet.locator('.score-grid button', { hasText: /^7$/ }).click()
+    await page.locator('.score-card.energy').click()
+    await sheet.locator('.score-grid button', { hasText: /^5$/ }).click()
+    await until(() => /mood: 7\nenergy: 5/.test(day()), 'frontmatter')
+    await page.locator('.score-card.mood .score-num', { hasText: '7' }).waitFor()
+  })
+
+  await step('日记全屏编辑并自动保存', async () => {
+    await page.locator('.journal-card').click()
+    await page.waitForURL(/#\/journal\//)
+    await page.fill('textarea.journal-area', '今天重新设计了 Life Log。\n\n很开心。')
+    await until(() => day().includes('## 日记\n\n今天重新设计了 Life Log。\n\n很开心。\n'), '日记')
+    await page.locator('.appbar-back').click()
+    await page.locator('.journal-preview', { hasText: '重新设计' }).waitFor()
+  })
+
+  await step('速记：卡片内直接添加', async () => {
+    const input = page.locator('.inline-add input[aria-label=速记]')
+    await input.fill('第一条速记')
+    await input.press('Enter')
     await page.locator('.notes li', { hasText: '第一条速记' }).waitFor()
-    await until(() => gh.read(DAY_PATH)?.includes('第一条速记'), '远端出现速记')
-    assert.match(gh.read(DAY_PATH), /^---\ndate: \d{4}-\d{2}-\d{2}\nmood:/)
-  })
-
-  await step('以 [] 开头的速记进入待办', async () => {
-    await capture.fill('[] 买牛奶 #生活')
-    await capture.press('Enter')
-    await until(() => gh.read('todo.md')?.includes('- [ ] 买牛奶 #生活'), 'todo.md 出现新待办')
-  })
-
-  await step('情绪 / 精力打分写入 frontmatter', async () => {
-    await page.locator('.score').nth(0).locator('.dot').nth(6).click()
-    await page.locator('.score').nth(1).locator('.dot').nth(4).click()
-    await until(() => /mood: 7\nenergy: 5/.test(gh.read(DAY_PATH) ?? ''), 'mood/energy')
-  })
-
-  await step('日记自动保存', async () => {
-    await page.fill('textarea.journal', '今天写了一个记录自己的系统。\n\n很开心。')
-    await until(() => gh.read(DAY_PATH)?.includes('## 日记\n\n今天写了一个记录自己的系统。\n\n很开心。\n'), '日记内容')
+    await until(() => day().includes('第一条速记'), '速记')
   })
 
   await step('另一台设备同时修改：两边内容都保留', async () => {
-    const other = gh.read(DAY_PATH).replace('## 速记\n', '## 速记\n\n- 07:00 手机上记的\n').replace(/\n\n\n/g, '\n\n')
-    gh.write(DAY_PATH, other)
-    await capture.fill('电脑上记的')
-    await capture.press('Enter')
-    await until(() => gh.read(DAY_PATH)?.includes('电脑上记的'), '合并后的速记')
-    const md = gh.read(DAY_PATH)
-    assert.ok(md.includes('手机上记的') && md.includes('第一条速记') && md.includes('很开心'))
+    gh.write(DAY_PATH, day().replace('## 速记\n', '## 速记\n\n- 07:00 手机上记的\n').replace(/\n\n\n/g, '\n\n'))
+    const input = page.locator('.inline-add input[aria-label=速记]')
+    await input.fill('电脑上记的')
+    await input.press('Enter')
+    await until(() => day().includes('电脑上记的'), '合并')
+    assert.ok(day().includes('手机上记的') && day().includes('第一条速记') && day().includes('很开心'))
   })
 
   await step('离线记录，联网后自动同步', async () => {
     await ctx.setOffline(true)
-    await capture.fill('地铁里没信号')
-    await capture.press('Enter')
+    await fab.click()
+    await sheet.locator('.segmented button', { hasText: '速记' }).click()
+    await sheet.locator('.capture-input').fill('地铁里没信号')
+    await sheet.locator('.capture-input').press('Enter')
     await page.locator('.notes li', { hasText: '地铁里没信号' }).waitFor()
-    await until(async () => /离线|待同步/.test(await page.textContent('.sync')), '离线状态')
-    assert.ok(!gh.read(DAY_PATH).includes('地铁里没信号'))
+    await until(async () => /离线|待同步/.test(await page.locator('.sync').first().textContent()), '离线状态')
+    assert.ok(!day().includes('地铁里没信号'))
     await ctx.setOffline(false)
-    await until(() => gh.read(DAY_PATH)?.includes('地铁里没信号'), '联网后同步')
-    await until(async () => (await page.textContent('.sync')) === '已同步', '状态回到已同步')
+    await until(() => day().includes('地铁里没信号'), '联网后同步')
   })
 
-  await step('刷新后内容来自本地缓存并保持一致', async () => {
-    await page.reload()
-    await page.locator('.notes li', { hasText: '地铁里没信号' }).waitFor()
-    assert.equal(await page.inputValue('textarea.journal'), '今天写了一个记录自己的系统。\n\n很开心。')
+  await step('计划：新建项目、加任务、进度更新', async () => {
+    await page.click('a.tab[href="#/plan"]')
+    await page.locator('.segmented button', { hasText: '项目' }).click()
+    await page.locator('.project-card.new').click()
+    await sheet.locator('input').first().fill('读书计划')
+    await sheet.locator('input').nth(1).fill('今年读完 24 本')
+    await sheet.locator('button[type=submit]').click()
+    await page.waitForURL(/#\/project\//)
+    const add = page.locator('.inline-add input')
+    await add.fill('读完《置身事内》')
+    await add.press('Enter')
+    await add.fill('写读书笔记')
+    await add.press('Enter')
+    await until(() => todo().includes('## 读书计划\n\n> 今年读完 24 本\n- [ ] 读完《置身事内》\n- [ ] 写读书笔记'), '项目写入')
+    await page.locator('.task', { hasText: '读完《置身事内》' }).locator('.check').click()
+    await page.locator('.project-progress', { hasText: '1/2' }).waitFor()
+    await page.locator('.appbar-back').click()
+    await page.locator('.project-card', { hasText: '读书计划' }).locator('.count', { hasText: '1/2' }).waitFor()
   })
 
-  await step('待办：完成、撤销、移动', async () => {
-    await page.click('a.tab[data-tab=todo]')
-    const item = page.locator('.todo', { hasText: '买牛奶' })
-    await item.locator('.check').click()
-    await until(() => gh.read('todo.md')?.includes(`- [x] 买牛奶 #生活 ✓${TODAY}`), '标记完成')
-    await page.locator('.done-box summary').click()
-    await page.locator('.done .todo', { hasText: '买牛奶' }).locator('.check').click()
-    await until(() => /## 现在[\s\S]*- \[ \] 买牛奶 #生活[\s\S]*## 之后/.test(gh.read('todo.md')), '撤销完成')
-    await page.locator('.todo', { hasText: '买牛奶' }).locator('button[title=移到之后]').click()
-    await until(() => /## 之后\n\n- \[ \] 买牛奶/.test(gh.read('todo.md')), '移到之后')
+  await step('点开任务：改文字、排日期、移到项目', async () => {
+    await page.locator('.segmented button', { hasText: '日程' }).click()
+    await page.locator('.card', { hasText: '收件箱' }).locator('.task', { hasText: '填写 me.md' }).click()
+    await sheet.locator('textarea.task-edit').fill('填写 me.md 的今年目标 #life-log')
+    await sheet.locator('.chip', { hasText: '今天' }).click()
+    await sheet.locator('.chip', { hasText: '读书计划' }).click()
+    await page.keyboard.press('Escape')
+    await until(() => /## 读书计划[\s\S]*- \[ \] 填写 me\.md 的今年目标 #life-log @\d{4}-\d{2}-\d{2}/.test(todo()), '编辑后的任务')
+    assert.ok(!/## 收件箱\n\n- \[ \] 填写/.test(todo()))
   })
 
   await step('从速记提炼为思想', async () => {
-    await page.click('a.tab[data-tab=today]')
+    await page.click('a.tab[href="#/"]')
     await page.locator('.notes li', { hasText: '第一条速记' }).locator('button').click()
     await page.waitForURL(/#\/thought\/new/)
-    assert.equal(await page.inputValue('.editor textarea'), '第一条速记')
+    assert.equal(await page.inputValue('.body-input'), '第一条速记')
     await page.fill('.title-input', '记录本身就是思考')
-    await page.fill('.editor input.small', '方法 记录')
+    await page.fill('.tags-input', '方法 记录')
     await until(() => gh.read('thoughts/记录本身就是思考.md'), '思想文件')
     const md = gh.read('thoughts/记录本身就是思考.md')
     assert.match(md, new RegExp(`created: ${TODAY}\\ntags: \\[方法, 记录\\]\\nfrom: ${TODAY}`))
     assert.ok(md.includes('# 记录本身就是思考\n\n第一条速记'))
-    await page.click('text=完成')
-    await page.locator('.reader h1', { hasText: '记录本身就是思考' }).waitFor()
+    await page.locator('.appbar .btn', { hasText: '完成' }).click()
+    await page.locator('.prose', { hasText: '第一条速记' }).waitFor()
   })
 
-  await step('思想列表与回看搜索', async () => {
-    await page.click('a.tab[data-tab=thoughts]')
-    await page.locator('.card', { hasText: '记录本身就是思考' }).waitFor()
-    await page.locator('.card', { hasText: '第一性原理' }).waitFor()
-    await page.click('a.tab[data-tab=review]')
-    await page.locator('.cell.val.mood').first().waitFor()
-    await page.fill('input[placeholder^="搜索日记"]', '地铁')
-    await page.locator('.results a', { hasText: '地铁里没信号' }).waitFor()
+  await step('笔记：思想列表、速记流、搜索', async () => {
+    await page.click('a.tab[href="#/notes"]')
+    await page.locator('.thought-card', { hasText: '记录本身就是思考' }).waitFor()
+    await page.locator('.thought-card', { hasText: '第一性原理' }).waitFor()
+    await page.locator('.segmented button', { hasText: '速记流' }).click()
+    await page.locator('.notes li', { hasText: '地铁里没信号' }).waitFor()
+    await page.fill('.search input', '地铁')
+    await page.locator('.result', { hasText: '地铁里没信号' }).waitFor()
+    await page.fill('.search input', '重新设计')
+    await page.locator('.result', { hasText: '日记' }).waitFor()
   })
 
-  await step('编辑 me.md', async () => {
-    await page.click('text=我是谁')
-    await page.locator('.prose h1', { hasText: '我是谁' }).waitFor()
-    await page.click('button:has-text("编辑")')
-    const v = await page.inputValue('textarea')
-    await page.fill('textarea', v.replace('## 价值观\n<!-- 我真正在乎什么？按优先级排。冲突时选哪个？ -->\n-', '## 价值观\n- 自由'))
-    await page.click('button:has-text("完成")')
-    await until(() => gh.read('me.md')?.includes('## 价值观\n- 自由'), 'me.md 保存')
+  await step('每周复盘：四步走完，生成复盘文件', async () => {
+    await page.click('a.tab[href="#/review"]')
+    await page.locator('.hero a', { hasText: '开始复盘' }).click()
+    await page.waitForURL(new RegExp(`#/week/${WEEK}`))
+    await page.locator('.card', { hasText: '完成了' }).locator('li', { hasText: '读完《置身事内》' }).waitFor()
+    await page.locator('.step-actions .btn.primary').click() // → 清理
+    await page.locator('.card', { hasText: '收件箱' }).waitFor()
+    await page.locator('.step-actions .btn.primary').click() // → 反思
+    await page.locator('.reflect textarea').nth(0).fill('重新设计了 App')
+    await page.locator('.reflect textarea').nth(1).fill('专注上午效率高')
+    await page.locator('.reflect textarea').nth(2).fill('- 早睡')
+    await page.locator('.step-actions .btn.primary').click() // → 计划
+    await page.locator('.card', { hasText: '今年的目标' }).getByText('读完 24 本书').waitFor()
+    const pick = page.locator('.pick-list li', { hasText: '写读书笔记' })
+    await pick.locator('.chip').first().click()
+    await until(() => /- \[ \] 写读书笔记 @\d{4}-\d{2}-\d{2}/.test(todo()), '排进下周')
+    await page.locator('.step-actions .btn.primary', { hasText: '完成复盘' }).click()
+    await page.waitForURL(/#\/file\/reviews/)
+    await until(() => gh.read(`reviews/${WEEK}.md`), '复盘文件')
+    const md = gh.read(`reviews/${WEEK}.md`)
+    assert.match(md, new RegExp(`^---\\nperiod: ${WEEK}\\n`))
+    assert.ok(md.includes('## 事实\n\n重新设计了 App') && md.includes('## 模式\n\n专注上午效率高') && md.includes('## 下一步\n\n- 早睡'))
+    assert.ok(/## 数据\n\n- 记录 \d\/7 天/.test(md))
+    await page.locator('.prose', { hasText: '专注上午效率高' }).waitFor()
   })
 
+  await step('复制给 AI', async () => {
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
+    await page.click('a.tab[href="#/review"]')
+    await page.locator('.ai-card button').click()
+    await page.getByText('已复制').waitFor()
+    const clip = await page.evaluate(() => navigator.clipboard.readText())
+    assert.ok(clip.includes(`帮我复盘 ${WEEK}`) && clip.includes('读完 24 本书') && clip.includes('重新设计了 Life Log'))
+  })
+
+  await step('编辑「我是谁」', async () => {
+    await page.locator('.list-row', { hasText: '我是谁' }).click()
+    await page.locator('.prose h2', { hasText: '价值观' }).waitFor()
+    await page.locator('.appbar .btn', { hasText: '编辑' }).click()
+    const v = await page.inputValue('textarea.source-input')
+    await page.fill('textarea.source-input', v.replace('## 价值观\n-', '## 价值观\n- 自由'))
+    await page.locator('.appbar .btn', { hasText: '完成' }).click()
+    await until(() => gh.read('me.md')?.includes('## 价值观\n- 自由'), 'me.md')
+  })
+
+  await step('刷新后数据来自缓存且一致', async () => {
+    await page.goto(BASE + '#/')
+    await page.locator('.notes li', { hasText: '地铁里没信号' }).waitFor()
+    await page.locator('.journal-preview', { hasText: '重新设计' }).waitFor()
+  })
+
+  assert.deepEqual(errors, [], '页面没有报错')
   assert.ok(gh.puts.every((p) => p.message), '每次提交都有说明')
-  console.log(`  提交记录：${gh.puts.map((p) => p.message).join(' / ')}`)
+  console.log(`  提交记录（${gh.puts.length}）：${[...new Set(gh.puts.map((p) => p.message))].join(' / ')}`)
   await ctx.close()
 
   if (SHOTS) {
     console.log('截图')
     mkdirSync(new URL('./shots', import.meta.url), { recursive: true })
     const sample = new FakeGitHub()
-    seedFromRepo(sample)
     seedSample(sample)
-    sample.write(DAY_PATH, `---\ndate: ${TODAY}\nmood: 7\nenergy: 6\ntags: []\n---\n## 日记\n\n早上去河边跑了五公里，回来把 life-log 搭了起来。\n\n第一次觉得，记录不是负担，而是和自己对话的方式。\n\n## 速记\n\n- 08:12 把复杂的问题拆成最小的事实\n- 13:40 午饭后散步 20 分钟，下午明显更清醒\n- 21:05 想读一本关于城市的书\n`)
     const targets = [
+      ['phone', { ...devices['Pixel 7'] }],
       ['desktop', { viewport: { width: 1280, height: 860 }, deviceScaleFactor: 2 }],
-      ['phone', { ...devices['iPhone 15'] }],
+    ]
+    const pages = [
+      ['today', '#/'],
+      ['plan', '#/plan'],
+      ['projects', '#/plan/projects'],
+      ['project', `#/project/${encodeURIComponent('读书计划')}`],
+      ['notes', '#/notes'],
+      ['review', '#/review'],
+      ['week', `#/week/${WEEK}`],
     ]
     for (const [name, opts] of targets)
       for (const scheme of ['light', 'dark']) {
-        const { ctx: c, page: p } = await newPage(sample, { ...opts, colorScheme: scheme })
+        const { ctx: c, page: p, errors: errs } = await newPage(sample, { ...opts, colorScheme: scheme })
         await connect(p)
-        for (const [tab, hash] of [['today', '#/'], ['todo', '#/todo'], ['thoughts', '#/thoughts'], ['review', '#/review']]) {
+        for (const [tab, hash] of pages) {
           await p.goto(BASE + hash)
-          await p.waitForTimeout(tab === 'review' ? 1200 : 500)
+          await p.waitForTimeout(tab === 'review' || tab === 'notes' ? 1200 : 600)
           const [sw, iw] = await p.evaluate(() => [document.documentElement.scrollWidth, innerWidth])
           assert.ok(sw <= iw, `${name} ${tab} 横向溢出：${sw} > ${iw}`)
           await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-${tab}.png`, import.meta.url).pathname, fullPage: name === 'desktop' })
         }
+        await p.goto(BASE + '#/')
+        await p.waitForTimeout(400)
+        await p.locator('button.fab, button.nav-new').filter({ visible: true }).first().click()
+        await p.waitForTimeout(450)
+        await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-capture.png`, import.meta.url).pathname })
+        assert.deepEqual(errs, [], `${name} ${scheme} 页面没有报错`)
         await c.close()
       }
     console.log('  → tests/shots/')

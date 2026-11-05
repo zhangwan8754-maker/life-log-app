@@ -1,84 +1,85 @@
 import { Marked } from 'marked'
+import { useEffect, useState } from 'preact/hooks'
 
-type Child = Node | string | number | null | undefined | false
-type Props = Record<string, unknown>
-
-/** 极小的 DOM 构造器：h('div.cls', {onclick}, ...children) */
-export function h<K extends keyof HTMLElementTagNameMap>(
-  sel: K | `${K}.${string}`,
-  props?: Props | Child | Child[],
-  ...children: (Child | Child[])[]
-): HTMLElementTagNameMap[K] {
-  const [tag, ...cls] = sel.split('.')
-  const el = document.createElement(tag as K)
-  if (cls.length) el.className = cls.join(' ')
-  if (Array.isArray(props) || props instanceof Node || typeof props !== 'object' || props === null) {
-    children.unshift(props as Child | Child[])
-  } else {
-    for (const [k, v] of Object.entries(props)) {
-      if (v === undefined || v === false) continue
-      if (k.startsWith('on')) el.addEventListener(k.slice(2), v as EventListener)
-      else if (k === 'class') el.className += (el.className ? ' ' : '') + v
-      else if (k in el && k !== 'list') (el as any)[k] = v
-      else el.setAttribute(k, v === true ? '' : String(v))
+/** 极简全局状态：一个值 + 订阅者 */
+export class Box<T> {
+  private ls = new Set<() => void>()
+  constructor(public value: T) {}
+  set(v: T) {
+    this.value = v
+    this.ls.forEach((f) => f())
+  }
+  subscribe(f: () => void) {
+    this.ls.add(f)
+    return () => {
+      this.ls.delete(f)
     }
   }
-  for (const c of children.flat()) if (c !== null && c !== undefined && c !== false) el.append(c instanceof Node ? c : String(c))
-  return el
+}
+
+export function useBox<T>(b: Box<T>): T {
+  const [, force] = useState(0)
+  useEffect(() => b.subscribe(() => force((x) => x + 1)), [b])
+  return b.value
 }
 
 export function debounce<A extends unknown[]>(fn: (...a: A) => void, ms: number) {
   let t = 0
+  let pending: A | null = null
   const d = (...a: A) => {
+    pending = a
     clearTimeout(t)
-    t = window.setTimeout(() => fn(...a), ms)
+    t = window.setTimeout(() => {
+      pending = null
+      fn(...a)
+    }, ms)
   }
-  d.flush = (...a: A) => {
+  d.flush = () => {
     clearTimeout(t)
-    fn(...a)
+    if (pending) {
+      const a = pending
+      pending = null
+      fn(...a)
+    }
   }
-  d.cancel = () => clearTimeout(t)
+  d.pending = () => pending !== null
   return d
 }
 
-/** textarea 随内容增高 */
-export function autoGrow(t: HTMLTextAreaElement) {
-  const fit = () => {
-    t.style.height = 'auto'
-    t.style.height = `${t.scrollHeight + 2}px`
-  }
-  t.addEventListener('input', fit)
-  addEventListener('resize', fit)
-  document.fonts?.ready.then(fit)
-  requestAnimationFrame(fit)
-  return fit
-}
-
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
-
 const marked = new Marked({ gfm: true, breaks: true })
 // 记录里的原始 HTML 一律当作文本显示
 marked.use({ renderer: { html: ({ text }) => esc(text) } })
 
-export function markdown(src: string): HTMLElement {
-  const div = h('div.prose')
-  div.innerHTML = marked.parse(src, { async: false }) as string
-  div.querySelectorAll('a').forEach((a) => {
-    a.target = '_blank'
-    a.rel = 'noopener'
-  })
-  div.querySelectorAll('input[type=checkbox]').forEach((i) => ((i as HTMLInputElement).disabled = true))
-  return div
+export function markdown(src: string): string {
+  return (marked.parse(src, { async: false }) as string)
+    .replace(/<a /g, '<a target="_blank" rel="noopener" ')
+    .replace(/<input /g, '<input disabled ')
 }
 
+// ───── toast ─────
+
+export interface Toast {
+  id: number
+  msg: string
+  action?: { label: string; run: () => void }
+}
+export const toastBox = new Box<Toast | null>(null)
 let toastTimer = 0
-export function toast(msg: string) {
-  let el = document.querySelector<HTMLElement>('.toast')
-  if (!el) document.body.append((el = h('div.toast', { role: 'status' })))
-  el.textContent = msg
-  el.classList.add('show')
+export function toast(msg: string, action?: Toast['action']) {
+  toastBox.set({ id: Date.now(), msg, action })
   clearTimeout(toastTimer)
-  toastTimer = window.setTimeout(() => el!.classList.remove('show'), 1800)
+  toastTimer = window.setTimeout(() => toastBox.set(null), action ? 4000 : 2000)
 }
 
-export const go = (hash: string) => (location.hash = hash)
+export const haptic = (ms = 8) => {
+  try {
+    navigator.vibrate?.(ms)
+  } catch {}
+}
+
+export const go = (hash: string) => {
+  location.hash = hash
+}
+
+export const cx = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(' ')
