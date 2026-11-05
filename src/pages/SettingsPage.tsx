@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact'
 import { useState } from 'preact/hooks'
 import { useStore } from '../lib/hooks'
 import { go, toast } from '../lib/ui'
+import { BrandMark } from '../components/Icon'
 import { Page } from '../components/Page'
 
 export function SettingsPage() {
@@ -26,7 +27,7 @@ export function SettingsPage() {
     <>
       {!c && (
         <div class="welcome">
-          <i class="brand-mark big" />
+          <BrandMark size={44} />
           <p>计划、日记、思想，都以 Markdown 存在你自己的 GitHub 仓库里。手机电脑互通，AI 随时可读。</p>
         </div>
       )}

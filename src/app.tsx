@@ -5,7 +5,7 @@ import { store } from './lib/store'
 import { INBOX, isLegacy } from './lib/todo'
 import { cx, toastBox, useBox } from './lib/ui'
 import { GlobalSheets } from './components/GlobalSheets'
-import { Icon } from './components/Icon'
+import { BrandMark, Icon } from './components/Icon'
 import { FilePage } from './pages/FilePage'
 import { PlanHome, SideNav } from './pages/HomePage'
 import { JournalPage } from './pages/JournalPage'
@@ -174,7 +174,7 @@ export function App() {
       {connected && (
         <aside class="side">
           <div class="side-brand">
-            <i class="brand-mark" />
+            <BrandMark size={22} />
             Life Log
           </div>
           <SideNav tab={tab} current={currentOf(r)} />

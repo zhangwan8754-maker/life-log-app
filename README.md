@@ -66,6 +66,7 @@ npm run build
 npm run e2e            # 端到端测试：真实浏览器 + 内存版假 GitHub（需全局安装 playwright）
 npm run e2e -- --shots # 同时生成 Pixel 7 与桌面、亮色与暗色的截图到 tests/shots/
 npm run e2e -- --board # 只渲染「今天」页的背景深浅对比图
+npm run icons          # 由 public/icon-v3-full.svg 生成浏览器图标和各尺寸 PNG（需全局安装 playwright）
 ```
 
 ### 代码结构

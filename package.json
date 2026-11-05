@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "e2e": "node tests/e2e.mjs"
+    "e2e": "node tests/e2e.mjs",
+    "icons": "node scripts/icons.mjs"
   },
   "dependencies": {
     "marked": "^18.1.3",

@@ -47,3 +47,25 @@ export function Icon({ name, size = 22, class: cls }: { name: keyof typeof P | s
     </svg>
   )
 }
+
+/** App 图标的缩小版（侧栏、欢迎页）：和桌面图标同一个图形，线条略加粗以便小尺寸看清 */
+export function BrandMark({ size = 22 }: { size?: number }) {
+  const id = `bm${size}`
+  return (
+    <svg class="brand-mark" width={size} height={size} viewBox="0 0 512 512" aria-hidden="true">
+      <defs>
+        <linearGradient id={`${id}s`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#7397CC" />
+          <stop offset="1" stop-color="#4A6EA6" />
+        </linearGradient>
+        <clipPath id={`${id}c`}>
+          <rect x="0" y="0" width="512" height="254" />
+        </clipPath>
+      </defs>
+      <rect width="512" height="512" rx="113" fill={`url(#${id}s)`} />
+      <circle cx="256" cy="272" r="104" fill="#fff" clip-path={`url(#${id}c)`} />
+      <rect x="104" y="263" width="304" height="22" rx="11" fill="#fff" />
+      <rect x="172" y="312" width="168" height="18" rx="9" fill="#fff" opacity="0.55" />
+    </svg>
+  )
+}
