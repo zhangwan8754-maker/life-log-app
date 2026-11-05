@@ -10,16 +10,31 @@ export const taskSheet = new Box<Task | null>(null)
 export const dateSheet = new Box<Task | null>(null)
 export const capture = new Box<{ mode: 'task' | 'note'; group?: string; date?: string } | null>(null)
 
-export function toggle(t: Task) {
-  store.enqueue(P, { kind: 'task.toggle', key: t.key, group: t.group, today: ymd() })
-  if (!t.done) {
-    haptic(12)
-    toast(`已完成「${t.text}」`, {
-      label: '撤销',
-      run: () => store.enqueue(P, { kind: 'task.toggle', key: t.key, group: t.group, today: ymd() }),
-    })
-  }
+/** 刚勾掉的任务：先停留（可反悔），再淡出，最后从列表里消失 */
+export const recent = new Box<Record<string, 'done' | 'leaving'>>({})
+export const taskId = (t: Task) => `${t.group}|${t.key}`
+const timers: Record<string, number[]> = {}
+
+function setRecent(id: string, v: 'done' | 'leaving' | null) {
+  const next = { ...recent.value }
+  if (v) next[id] = v
+  else delete next[id]
+  recent.set(next)
 }
+
+export function toggle(t: Task) {
+  const id = taskId(t)
+  store.enqueue(P, { kind: 'task.toggle', key: t.key, group: t.group, today: ymd() })
+  timers[id]?.forEach(clearTimeout)
+  if (!t.done) {
+    haptic(10)
+    setRecent(id, 'done')
+    timers[id] = [window.setTimeout(() => setRecent(id, 'leaving'), 1700), window.setTimeout(() => setRecent(id, null), 2100)]
+  } else setRecent(id, null)
+}
+
+/** 列表里要显示的任务：未完成的 + 刚勾掉、还在停留的 */
+export const visible = (t: Task, rec: Record<string, string>) => !t.done || !!rec[taskId(t)]
 
 export function setDate(t: Task, date: string): Task {
   store.enqueue(P, { kind: 'task.date', key: t.key, group: t.group, date })

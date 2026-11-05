@@ -1,29 +1,22 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { capture } from './lib/actions'
 import { useStore } from './lib/hooks'
 import { store } from './lib/store'
-import { isLegacy } from './lib/todo'
+import { INBOX, isLegacy } from './lib/todo'
 import { cx, toastBox, useBox } from './lib/ui'
 import { GlobalSheets } from './components/GlobalSheets'
 import { Icon } from './components/Icon'
 import { FilePage } from './pages/FilePage'
+import { PlanHome, SideNav } from './pages/HomePage'
 import { JournalPage } from './pages/JournalPage'
 import { NotesPage } from './pages/NotesPage'
-import { PlanPage } from './pages/PlanPage'
+import { UpcomingPage } from './pages/UpcomingPage'
 import { ProjectPage } from './pages/ProjectPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { ThoughtPage } from './pages/ThoughtPage'
 import { TodayPage } from './pages/TodayPage'
 import { WeekPage } from './pages/WeekPage'
-
-type Tab = 'today' | 'plan' | 'notes' | 'review'
-const TABS: [Tab, string, string, string][] = [
-  ['today', '#/', '今天', 'today'],
-  ['plan', '#/plan', '计划', 'plan'],
-  ['notes', '#/notes', '笔记', 'notes'],
-  ['review', '#/review', '复盘', 'review'],
-]
 
 interface Route {
   name: string
@@ -34,18 +27,34 @@ const parse = (): Route => {
   return { name, args: args.map(decodeURIComponent) }
 }
 
+/** 层级：四个主页 0，进入一层 1，再深一层 2。决定切换动画的方向 */
+const DEPTH: Record<string, number> = {
+  '': 0, day: 0, home: 0, plan: 0, notes: 0, review: 0,
+  upcoming: 1, project: 1, journal: 1, thought: 1, week: 1, file: 1, settings: 1,
+}
+
+type Tab = 'today' | 'plan' | 'notes' | 'review'
 const TAB_OF: Record<string, Tab> = {
   '': 'today', day: 'today', journal: 'today',
-  plan: 'plan', project: 'plan',
+  home: 'plan', plan: 'plan', upcoming: 'plan', project: 'plan',
   notes: 'notes', thought: 'notes',
   review: 'review', week: 'review', file: 'review', settings: 'review',
 }
-/** 显示 ＋ 按钮的页面，以及它的默认值 */
+const TABS: [Tab, string, string, string][] = [
+  ['today', '#/', '今天', 'today'],
+  ['plan', '#/plan', '计划', 'plan'],
+  ['notes', '#/notes', '笔记', 'notes'],
+  ['review', '#/review', '复盘', 'review'],
+]
+
+/** 显示 ＋ 的页面，以及它的默认值 */
 const FAB: Record<string, () => Parameters<typeof capture.set>[0]> = {
   '': () => ({ mode: 'task' }),
+  home: () => ({ mode: 'task', date: '' }),
   day: () => ({ mode: 'task' }),
+  upcoming: () => ({ mode: 'task', date: '' }),
   plan: () => ({ mode: 'task', date: '' }),
-  project: () => ({ mode: 'task', date: '', group: parse().args[0] }),
+  project: () => ({ mode: 'task', date: '', group: parse().args[0] || INBOX }),
   notes: () => ({ mode: 'note' }),
   review: () => ({ mode: 'task' }),
 }
@@ -53,15 +62,22 @@ const FAB: Record<string, () => Parameters<typeof capture.set>[0]> = {
 function useRoute(): Route {
   const [r, setR] = useState(parse)
   useEffect(() => {
+    let cur = parse()
     const on = () => {
       const next = parse()
+      const a = DEPTH[cur.name] ?? 1
+      const b = DEPTH[next.name] ?? 1
+      cur = next
+      document.documentElement.dataset.nav = b > a ? 'push' : b < a ? 'pop' : 'fade'
       const vt = (document as any).startViewTransition
       if (vt && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        vt.call(document, async () => {
+        const t = vt.call(document, async () => {
           setR(next)
           await new Promise((res) => setTimeout(res, 0))
           scrollTo(0, 0)
         })
+        // 快速连续跳转时，前一个过渡会被取消：这是正常的，不算错误
+        for (const p of [t.ready, t.finished, t.updateCallbackDone]) p?.catch(() => {})
       } else {
         setR(next)
         scrollTo(0, 0)
@@ -76,10 +92,12 @@ function useRoute(): Route {
 function Page({ r }: { r: Route }) {
   const [a = '', b = ''] = r.args
   switch (r.name) {
+    case 'home':
+    case 'plan': return <PlanHome />
     case '': return <TodayPage />
     case 'day': return <TodayPage date={a} />
     case 'journal': return <JournalPage date={a} />
-    case 'plan': return <PlanPage seg={a === 'projects' ? 'projects' : 'agenda'} />
+    case 'upcoming': return <UpcomingPage />
     case 'project': return <ProjectPage name={a} />
     case 'notes': return <NotesPage seg={a === 'stream' ? 'stream' : 'thoughts'} />
     case 'thought': return <ThoughtPage arg={[a, b].filter(Boolean).join('/')} />
@@ -91,16 +109,24 @@ function Page({ r }: { r: Route }) {
   }
 }
 
+/** 侧栏「计划」下面高亮哪一项 */
+const currentOf = (r: Route) => (r.name === 'project' ? r.args[0] : r.name === 'upcoming' ? 'upcoming' : undefined)
+
 function ToastView() {
-  const t = useBox(toastBox)
+  const cur = useBox(toastBox)
+  // 淡出时保留最后一条内容，避免出现一个空的小方块
+  const last = useRef(cur)
+  if (cur) last.current = cur
+  const t = cur ?? last.current
   return (
-    <div class={cx('toast', t && 'show')} role="status" aria-live="polite">
+    <div class={cx('toast', cur && 'show')} role="status" aria-live="polite">
       {t && (
         <>
           <span>{t.msg}</span>
           {t.action && (
             <button
               type="button"
+              tabIndex={cur ? 0 : -1}
               onClick={() => {
                 t.action!.run()
                 toastBox.set(null)
@@ -118,7 +144,6 @@ function ToastView() {
 export function App() {
   const s = useStore()
   const r = useRoute()
-  const tab = TAB_OF[r.name] ?? 'today'
   const connected = !!s.config
 
   useEffect(() => {
@@ -143,29 +168,29 @@ export function App() {
   }, [])
 
   const fab = connected ? FAB[r.name] : undefined
+  const tab = TAB_OF[r.name] ?? 'today'
   return (
     <div class={cx('shell', !connected && 'setup')}>
       {connected && (
-        <nav class="nav" aria-label="主导航">
-          <a class="brand" href="#/">
+        <aside class="side">
+          <div class="side-brand">
             <i class="brand-mark" />
-            <span>Life Log</span>
-          </a>
-          {TABS.map(([id, href, label, icon]) => (
-            <a class={cx('tab', tab === id && 'on')} href={href} aria-current={tab === id ? 'page' : undefined}>
-              <span class="tab-icon">
-                <Icon name={icon} />
-              </span>
-              <span class="tab-label">{label}</span>
-            </a>
-          ))}
-          <button type="button" class="nav-new" onClick={() => capture.set((fab ?? FAB[''])())}>
-            <Icon name="plus" />
-            新建
-          </button>
-        </nav>
+            Life Log
+          </div>
+          <SideNav tab={tab} current={currentOf(r)} />
+        </aside>
       )}
       <main class="main">{connected || r.name === 'settings' ? <Page r={r} /> : null}</main>
+      {connected && (
+        <nav class="tabbar" aria-label="主导航">
+          {TABS.map(([id, href, label, icon]) => (
+            <a href={href} class={cx(tab === id && 'on')} aria-current={tab === id ? 'page' : undefined}>
+              <Icon name={icon} size={25} />
+              <span>{label}</span>
+            </a>
+          ))}
+        </nav>
+      )}
       {fab && (
         <button type="button" class="fab" aria-label="新建" onClick={() => capture.set(fab())}>
           <Icon name="plus" size={26} />

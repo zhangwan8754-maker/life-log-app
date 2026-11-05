@@ -36,8 +36,9 @@ export function JournalPage({ date }: { date: string }) {
 
   return (
     <Page
-      title="日记"
-      subtitle={`${cnMonthDay(d)} ${weekday(d)}${editing ? ' · 编辑中' : ''}`}
+      title={cnMonthDay(d)}
+      icon="journal"
+      subtitle={`${weekday(d)} · 日记${editing ? ' · 编辑中' : ''}`}
       back={{ href: d === ymd() ? '#/' : `#/day/${d}`, label: d === ymd() ? '今天' : cnMonthDay(d) }}
       class="journal-page"
     >

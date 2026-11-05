@@ -35,7 +35,7 @@ export function FilePage({ path }: { path: string }) {
   const toggle = (
     <button
       type="button"
-      class="btn tonal small"
+      class="text-btn strong"
       onClick={() => {
         if (editing) save.flush()
         else {
@@ -58,7 +58,7 @@ export function FilePage({ path }: { path: string }) {
       actions={
         <>
           {week && !editing && (
-            <a class="btn small" href={`#/week/${week}`}>
+            <a class="text-btn" href={`#/week/${week}`}>
               重走流程
             </a>
           )}
@@ -82,9 +82,11 @@ export function FilePage({ path }: { path: string }) {
       ) : md === undefined ? (
         <div class="loading-block" />
       ) : md === null ? (
-        <Empty>还没有这个文件，点「编辑」开始写。</Empty>
+        <div class="group">
+          <Empty icon="journal">还没有这个文件，点右上角「编辑」开始写。</Empty>
+        </div>
       ) : (
-        <article class="card prose" dangerouslySetInnerHTML={{ __html: markdown(body) }} />
+        <article class="group prose doc" dangerouslySetInnerHTML={{ __html: markdown(body) }} />
       )}
     </Page>
   )

@@ -10,9 +10,9 @@ import { cx, debounce, go, markdown, toast } from '../lib/ui'
 import { Trend } from '../components/Charts'
 import { Chip } from '../components/Controls'
 import { Icon } from '../components/Icon'
-import { Card, Empty, Page } from '../components/Page'
+import { Empty, Page } from '../components/Page'
 import { TaskRow } from '../components/TaskRow'
-import { thoughtIndex } from './ReviewPage'
+import { Stats, thoughtIndex } from './ReviewPage'
 
 const STEPS = ['回顾', '清理', '反思', '计划'] as const
 
@@ -46,7 +46,12 @@ export function WeekPage({ id }: { id: string }) {
   )
   useEffect(() => () => save.flush(), [save])
 
-  if (!r) return <Page title="复盘" back={{ href: '#/review', label: '复盘' }}><Empty>无法识别的周：{id}</Empty></Page>
+  if (!r)
+    return (
+      <Page title="复盘" back={{ href: '#/review', label: '复盘' }}>
+        <Empty>无法识别的周：{id}</Empty>
+      </Page>
+    )
 
   const stats = weekStats(r, dayMd, todo, thoughtIndex(), today)
   const update = (patch: Partial<ReviewParts>) => {
@@ -63,16 +68,16 @@ export function WeekPage({ id }: { id: string }) {
 
   return (
     <Page title={`第 ${r.week} 周`} subtitle={`${cnMonthDay(r.from)} – ${cnMonthDay(r.to)}`} back={{ href: '#/review', label: '复盘' }} class="week-page">
-      <ol class="stepper">
-        {STEPS.map((s, i) => (
-          <li class={cx(i === step && 'on', i < step && 'done')}>
-            <button type="button" onClick={() => setStep(i)}>
-              <span class="step-dot">{i < step ? <Icon name="check" size={14} /> : i + 1}</span>
-              <span>{s}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
+      <div class="steps" role="tablist">
+        <span class="steps-text">
+          {step + 1} / 4 · <b>{STEPS[step]}</b>
+        </span>
+        <span class="steps-dots">
+          {STEPS.map((s, i) => (
+            <button type="button" role="tab" aria-selected={i === step} aria-label={s} class={cx(i === step && 'on', i < step && 'done')} onClick={() => setStep(i)} />
+          ))}
+        </span>
+      </div>
 
       {step === 0 && <Recap r={r} stats={stats} />}
       {step === 1 && <Tidy today={today} />}
@@ -80,10 +85,12 @@ export function WeekPage({ id }: { id: string }) {
       {step === 3 && <PlanNext today={today} me={me} />}
 
       <div class="step-actions">
-        {step > 0 && (
+        {step > 0 ? (
           <button type="button" class="btn" onClick={() => setStep(step - 1)}>
             上一步
           </button>
+        ) : (
+          <span />
         )}
         {step < 3 ? (
           <button type="button" class="btn primary" onClick={() => setStep(step + 1)}>
@@ -107,61 +114,51 @@ function Recap({ r, stats }: { r: NonNullable<ReturnType<typeof weekFromId>>; st
   return (
     <>
       <p class="step-intro">先只看事实：这一周发生了什么。</p>
-      <div class="tiles">
-        <div class="tile">
-          <span class="tile-num">{stats.completed.length}</span>
-          <span class="tile-label">完成</span>
-        </div>
-        <div class="tile">
-          <span class="tile-num">{stats.daysLogged}/7</span>
-          <span class="tile-label">记录天数</span>
-        </div>
-        <div class="tile">
-          <span class="tile-num">{stats.moodAvg}</span>
-          <span class="tile-label">平均情绪</span>
-        </div>
-        <div class="tile">
-          <span class="tile-num">{stats.energyAvg}</span>
-          <span class="tile-label">平均精力</span>
-        </div>
-      </div>
+      <Stats s={stats} />
       {(stats.mood.some((v) => v !== null) || stats.energy.some((v) => v !== null)) && (
-        <Card title="情绪与精力">
-          <Trend dates={r.days} mood={stats.mood} energy={stats.energy} />
-        </Card>
+        <>
+          <p class="group-label">情绪与精力</p>
+          <div class="group chart-group">
+            <Trend dates={r.days} mood={stats.mood} energy={stats.energy} />
+          </div>
+        </>
       )}
-      <Card title="完成了" action={<span class="count">{stats.completed.length}</span>}>
+      <p class="group-label">完成了 {stats.completed.length} 件</p>
+      <div class="group">
         {stats.completed.length ? (
-          <ul class="plain-list">
-            {stats.completed.map((t) => (
-              <li>
-                <Icon name="check" size={16} />
-                {t.text}
-                <span class="muted"> · {t.group}</span>
-              </li>
-            ))}
-          </ul>
+          stats.completed.map((t) => (
+            <div class="row plain">
+              <span class="row-icon">
+                <Icon name="check" size={20} />
+              </span>
+              <span class="row-label">{t.text}</span>
+              <span class="row-detail">{t.group}</span>
+            </div>
+          ))
         ) : (
-          <Empty>这周还没有完成的待办。</Empty>
+          <p class="group-empty">这周还没有完成的待办。</p>
         )}
-      </Card>
+      </div>
       {excerpts.length > 0 && (
-        <Card title="日记摘录">
-          <ul class="plain-list excerpts">
+        <>
+          <p class="group-label">日记摘录</p>
+          <div class="group">
             {excerpts.map((x) => (
-              <li>
-                <a href={`#/journal/${x.d}`}>
-                  <span class="muted">{shortWeekday(x.d)}</span> {x.j}
-                </a>
-              </li>
+              <a class="row excerpt" href={`#/journal/${x.d}`}>
+                <span class="excerpt-day">{shortWeekday(x.d)}</span>
+                <span class="row-label">{x.j}</span>
+              </a>
             ))}
-          </ul>
-        </Card>
+          </div>
+        </>
       )}
       {stats.thoughts.length > 0 && (
-        <Card title="新的思想">
-          <p>{stats.thoughts.join('、')}</p>
-        </Card>
+        <>
+          <p class="group-label">新的思想</p>
+          <div class="group">
+            <p class="group-text">{stats.thoughts.join('、')}</p>
+          </div>
+        </>
       )}
     </>
   )
@@ -175,7 +172,8 @@ function Tidy({ today }: { today: string }) {
   return (
     <>
       <p class="step-intro">把悬着的事处理掉：右滑完成，左滑改期，点开可以归到项目或删除。</p>
-      <Card title={<span class="over">逾期</span>} action={<span class="count">{overdue.length}</span>}>
+      <p class="group-label late">逾期 {overdue.length}</p>
+      <div class="group">
         {overdue.length ? (
           <div class="tasks">
             {overdue.map((t) => (
@@ -183,10 +181,11 @@ function Tidy({ today }: { today: string }) {
             ))}
           </div>
         ) : (
-          <Empty>没有逾期的事。</Empty>
+          <p class="group-empty">没有逾期的事。</p>
         )}
-      </Card>
-      <Card title="收件箱" action={<span class="count">{inbox.length}</span>}>
+      </div>
+      <p class="group-label">收件箱 {inbox.length}</p>
+      <div class="group">
         {inbox.length ? (
           <div class="tasks">
             {inbox.map((t) => (
@@ -194,24 +193,25 @@ function Tidy({ today }: { today: string }) {
             ))}
           </div>
         ) : (
-          <Empty>收件箱已清空。</Empty>
+          <p class="group-empty">收件箱已经清空。</p>
         )}
-      </Card>
+      </div>
     </>
   )
 }
 
 function Reflect({ parts, update, stats }: { parts: ReviewParts; update: (p: Partial<ReviewParts>) => void; stats: ReturnType<typeof weekStats> }) {
   const field = (k: keyof ReviewParts, label: string, hint: string) => (
-    <label class="card reflect">
-      <span class="reflect-label">{label}</span>
-      <span class="reflect-hint">{hint}</span>
-      <textarea rows={4} value={parts[k]} onInput={(e) => update({ [k]: (e.target as HTMLTextAreaElement).value })} />
-    </label>
+    <>
+      <p class="group-label">{label}</p>
+      <label class="group reflect">
+        <textarea rows={4} value={parts[k]} placeholder={hint} aria-label={label} onInput={(e) => update({ [k]: (e.target as HTMLTextAreaElement).value })} />
+      </label>
+    </>
   )
   return (
     <>
-      <p class="step-intro">数据会自动写进复盘。你只需要写三件事。</p>
+      <p class="step-intro">数据会自动写进复盘，你只需要写三件事。</p>
       {field('facts', '事实', `这周发生了什么？只写事实。（完成 ${stats.completed.length} 件，记录 ${stats.daysLogged} 天）`)}
       {field('patterns', '模式', '什么在重复？哪些事让状态变好或变差？说的和做的一致吗？')}
       {field('next', '下一步', '最多 3 条，写成能执行的动作。下一页可以直接排进日程。')}
@@ -225,54 +225,53 @@ function PlanNext({ today, me }: { today: string; me: string }) {
   const mon = addDays(today, ((8 - new Date().getDay()) % 7) || 7)
   const week = Array.from({ length: 7 }, (_, i) => addDays(mon, i))
   const open = allTasks(groups).filter((t) => !t.done)
-  const scheduled = open.filter((t) => t.date >= week[0] && t.date <= week[6])
+  const scheduled = open.filter((t) => t.date >= week[0] && t.date <= week[6]).sort((a, b) => a.date.localeCompare(b.date))
   const candidates = open.filter((t) => !t.date && t.group !== SOMEDAY)
   return (
     <>
       <p class="step-intro">对照今年的目标，挑出下周最重要的几件，排上日子。</p>
-      <Card title="今年的目标">
+      <p class="group-label">今年的目标</p>
+      <div class="group">
         {goals ? (
-          <div class="prose small" dangerouslySetInnerHTML={{ __html: markdown(goals) }} />
+          <div class="prose group-text" dangerouslySetInnerHTML={{ __html: markdown(goals) }} />
         ) : (
-          <Empty>
+          <p class="group-empty">
             还没写。<a href="#/file/me.md">去「我是谁」里填上</a>，复盘时就能对照。
-          </Empty>
+          </p>
         )}
-      </Card>
-      <Card title="下周已安排" action={<span class="count">{scheduled.length}</span>}>
+      </div>
+      <p class="group-label">下周已安排 {scheduled.length}</p>
+      <div class="group">
         {scheduled.length ? (
           <div class="tasks">
-            {scheduled
-              .sort((a, b) => a.date.localeCompare(b.date))
-              .map((t) => (
-                <TaskRow task={t} today={today} />
-              ))}
+            {scheduled.map((t) => (
+              <TaskRow task={t} today={today} />
+            ))}
           </div>
         ) : (
-          <Empty>下周还没有安排。</Empty>
+          <p class="group-empty">下周还没有安排。</p>
         )}
-      </Card>
-      <Card title="还没排日期" action={<span class="count">{candidates.length}</span>}>
+      </div>
+      <p class="group-label">还没排日期 {candidates.length}</p>
+      <div class="group">
         {candidates.length ? (
-          <ul class="pick-list">
-            {candidates.map((t) => (
-              <li>
-                <div class="pick-text">
-                  {t.text}
-                  {t.group !== INBOX && <span class="muted"> · {t.group}</span>}
-                </div>
-                <div class="chips tight">
-                  {week.map((d) => (
-                    <Chip onClick={() => setDate(t, d)}>{shortWeekday(d).slice(1)}</Chip>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
+          candidates.map((t) => (
+            <div class="pick-item">
+              <div class="pick-text">
+                {t.text}
+                {t.group !== INBOX && <span class="muted"> · {t.group}</span>}
+              </div>
+              <div class="chips tight">
+                {week.map((d) => (
+                  <Chip onClick={() => setDate(t, d)}>{shortWeekday(d).slice(1)}</Chip>
+                ))}
+              </div>
+            </div>
+          ))
         ) : (
-          <Empty>所有任务都排好了。</Empty>
+          <p class="group-empty">所有任务都排好了。</p>
         )}
-      </Card>
+      </div>
     </>
   )
 }

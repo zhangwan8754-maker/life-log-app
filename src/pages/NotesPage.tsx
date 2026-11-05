@@ -3,10 +3,12 @@ import { cnMonthDay, weekday } from '../lib/dates'
 import { useStore, useTree } from '../lib/hooks'
 import { getMeta, getSection, parseNotes, stripFrontmatter, thoughtBody } from '../lib/md'
 import { cx, go } from '../lib/ui'
-import { Chip, Segmented } from '../components/Controls'
+import { Chip, Tabs } from '../components/Controls'
 import { Icon } from '../components/Icon'
-import { Card, Empty, Page } from '../components/Page'
+import { Empty, Page } from '../components/Page'
 import { setDraft, tagsOf, titleOf } from './ThoughtPage'
+
+const excerpt = (md: string) => thoughtBody(md).replace(/^[\s>#*-]+/gm, '').replace(/[*_`[\]]/g, '').replace(/\s+/g, ' ').slice(0, 80)
 
 export function NotesPage({ seg }: { seg: 'thoughts' | 'stream' }) {
   const s = useStore()
@@ -24,34 +26,36 @@ export function NotesPage({ seg }: { seg: 'thoughts' | 'stream' }) {
     .filter((d) => d.date)
     .sort((a, b) => b.date.localeCompare(a.date))
   const allTags = [...new Set(thoughts.flatMap((t) => tagsOf(t.md)))]
+  const shown = thoughts.filter((t) => !tag || tagsOf(t.md).includes(tag))
 
   return (
     <Page
       title="笔记"
-      subtitle="积累与检索：思想卡片和所有速记"
+      icon="notes"
       actions={
         <a class="icon-btn" href="#/thought/new" aria-label="新建思想">
-          <Icon name="edit" />
+          <Icon name="edit" size={21} />
         </a>
       }
     >
       <label class="search">
-        <Icon name="search" size={20} />
+        <Icon name="search" size={19} />
         <input type="search" value={q} placeholder="搜索思想、速记、日记" onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
       </label>
       {q.trim() ? (
         <Results q={q.trim()} thoughts={thoughts} days={days} />
       ) : (
         <>
-          <Segmented
-            value={seg}
-            options={[
-              { value: 'thoughts', label: `思想 ${thoughts.length || ''}`.trim() },
-              { value: 'stream', label: '速记流' },
-            ]}
-            onChange={(v) => go(v === 'stream' ? '#/notes/stream' : '#/notes')}
-          />
-          {!loaded && <div class="loading-block" />}
+          <div class="notes-tabs">
+            <Tabs
+              value={seg}
+              options={[
+                { value: 'thoughts', label: `思想${thoughts.length ? ` ${thoughts.length}` : ''}` },
+                { value: 'stream', label: '速记' },
+              ]}
+              onChange={(v) => go(v === 'stream' ? '#/notes/stream' : '#/notes')}
+            />
+          </div>
           {seg === 'thoughts' ? (
             <>
               {allTags.length > 0 && (
@@ -66,23 +70,21 @@ export function NotesPage({ seg }: { seg: 'thoughts' | 'stream' }) {
                   ))}
                 </div>
               )}
-              <div class="thought-grid">
-                {thoughts
-                  .filter((t) => !tag || tagsOf(t.md).includes(tag))
-                  .map(({ p, md }) => (
-                    <a class="card thought-card" href={`#/thought/${encodeURIComponent(p)}`}>
-                      <h3>{titleOf(p, md)}</h3>
-                      <p>{thoughtBody(md).replace(/^[\s>#*-]+/gm, '').replace(/[*_`[\]]/g, '').slice(0, 140)}</p>
-                      <div class="thought-meta">
-                        <span>{getMeta(md, 'created')}</span>
-                        {tagsOf(md).map((t) => (
-                          <span class="tag">#{t}</span>
-                        ))}
-                      </div>
-                    </a>
-                  ))}
+              <div class="group">
+                {shown.map(({ p, md }) => (
+                  <a class="row thought-row" href={`#/thought/${encodeURIComponent(p)}`}>
+                    <span class="thought-title">{titleOf(p, md)}</span>
+                    <span class="thought-excerpt">{excerpt(md)}</span>
+                    <span class="thought-meta">
+                      {getMeta(md, 'created')}
+                      {tagsOf(md).map((t) => (
+                        <span class="tag">#{t}</span>
+                      ))}
+                    </span>
+                  </a>
+                ))}
+                {loaded && !shown.length && <Empty icon="notes">还没有思想。在速记旁点 ↗，把一闪而过的念头写成完整的想法。</Empty>}
               </div>
-              {loaded && !thoughts.length && <Empty>还没有思想卡片。在速记旁点 ↗ 把一闪而过的念头提炼成完整的想法。</Empty>}
             </>
           ) : (
             <Stream days={days} />
@@ -95,39 +97,42 @@ export function NotesPage({ seg }: { seg: 'thoughts' | 'stream' }) {
 
 function Stream({ days }: { days: { date: string; md: string }[] }) {
   const withNotes = days.map((d) => ({ ...d, notes: parseNotes(d.md) })).filter((d) => d.notes.length)
-  if (!withNotes.length) return <Empty>还没有速记。点右下角 ＋ 随手记一条。</Empty>
+  if (!withNotes.length)
+    return (
+      <div class="group">
+        <Empty icon="note">还没有速记。点右下角 ＋ 随手记一条。</Empty>
+      </div>
+    )
   return (
     <>
       {withNotes.slice(0, 60).map((d) => (
-        <Card
-          title={
-            <a href={`#/day/${d.date}`}>
-              {cnMonthDay(d.date)}
-              <span class="card-title-sub">{weekday(d.date)}</span>
-            </a>
-          }
-        >
-          <ul class="notes">
-            {d.notes.map((n) => (
-              <li>
-                <time>{n.time}</time>
-                <span>{n.text}</span>
-                <button
-                  type="button"
-                  class="icon-btn small"
-                  aria-label="提炼为思想"
-                  title="提炼为思想"
-                  onClick={() => {
-                    setDraft({ body: n.text, from: d.date })
-                    go('#/thought/new')
-                  }}
-                >
-                  <Icon name="distill" size={18} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <>
+          <a class="group-label link" href={`#/day/${d.date}`}>
+            {cnMonthDay(d.date)} {weekday(d.date)}
+          </a>
+          <div class="group">
+            <ul class="notes in-group">
+              {d.notes.map((n) => (
+                <li>
+                  <time>{n.time}</time>
+                  <span>{n.text}</span>
+                  <button
+                    type="button"
+                    class="icon-btn tiny"
+                    aria-label="提炼为思想"
+                    title="提炼为思想"
+                    onClick={() => {
+                      setDraft({ body: n.text, from: d.date })
+                      go('#/thought/new')
+                    }}
+                  >
+                    <Icon name="distill" size={17} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
       ))}
     </>
   )
@@ -138,7 +143,7 @@ function Results({ q, thoughts, days }: { q: string; thoughts: { p: string; md: 
   const snip = (text: string) => {
     const i = text.toLowerCase().indexOf(kw)
     if (i < 0) return null
-    return (i > 24 ? '…' : '') + text.slice(Math.max(0, i - 24), i + kw.length + 60).replace(/\s+/g, ' ')
+    return (i > 20 ? '…' : '') + text.slice(Math.max(0, i - 20), i + kw.length + 50).replace(/\s+/g, ' ')
   }
   const mark = (t: string) => {
     const i = t.toLowerCase().indexOf(kw)
@@ -157,16 +162,18 @@ function Results({ q, thoughts, days }: { q: string; thoughts: { p: string; md: 
     const sn = snip(getSection(d.md, '日记') ?? '')
     if (sn) hits.push({ href: `#/journal/${d.date}`, kind: '日记', title: d.date, snip: sn })
   }
-  if (!hits.length) return <Empty>没有找到「{q}」。</Empty>
   return (
-    <div class="card results">
+    <div class="group search-results">
       {hits.slice(0, 50).map((h) => (
-        <a class="result" href={h.href}>
-          <span class={cx('result-kind', h.kind === '思想' && 'accent')}>{h.kind}</span>
-          <span class="result-title">{h.title}</span>
+        <a class="row result" href={h.href}>
+          <span class="result-top">
+            <span class={cx('result-kind', h.kind === '思想' && 'accent')}>{h.kind}</span>
+            <span class="result-title">{h.title}</span>
+          </span>
           <span class="result-snip">{mark(h.snip)}</span>
         </a>
       ))}
+      {!hits.length && <Empty icon="search">没有找到「{q}」。</Empty>}
     </div>
   )
 }

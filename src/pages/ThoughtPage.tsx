@@ -81,7 +81,7 @@ export function ThoughtPage({ arg }: { arg: string }) {
   const toggle = (
     <button
       type="button"
-      class="btn tonal small"
+      class="text-btn strong"
       onClick={() => {
         if (editing) save.flush()
         else if (md) {

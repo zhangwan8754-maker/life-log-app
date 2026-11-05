@@ -1,9 +1,9 @@
 import type { ComponentChildren } from 'preact'
 import { useRef } from 'preact/hooks'
-import { dateSheet, taskSheet, toggle } from '../lib/actions'
+import { dateSheet, recent, taskId, taskSheet, toggle } from '../lib/actions'
 import { daysBetween, relDay } from '../lib/dates'
 import { INBOX, type Task } from '../lib/todo'
-import { cx, haptic } from '../lib/ui'
+import { cx, haptic, useBox } from '../lib/ui'
 import { Check } from './Controls'
 import { Icon } from './Icon'
 
@@ -102,44 +102,46 @@ export function SwipeRow({
 export function dateLabel(t: Task, today: string) {
   if (!t.date) return null
   const late = !t.done && t.date < today
-  return <span class={cx('meta-date', late && 'over')}>{late ? `逾期 ${daysBetween(t.date, today)} 天` : relDay(t.date, today)}</span>
+  return <span class={cx('meta-date', late && 'late')}>{late ? `逾期 ${daysBetween(t.date, today)} 天` : relDay(t.date, today)}</span>
 }
 
 export function TaskRow({ task: t, today, showGroup = true, showDate = true }: { task: Task; today: string; showGroup?: boolean; showDate?: boolean }) {
+  const rec = useBox(recent)
+  const state = rec[taskId(t)]
+  const done = t.done
   const meta = [
+    showGroup && t.group !== INBOX && <span class="meta-group">{t.group}</span>,
     showDate && dateLabel(t, today),
-    showGroup && t.group !== INBOX && (
-      <span class="meta-group">
-        <Icon name="folder" size={13} />
-        {t.group}
-      </span>
-    ),
     ...t.tags.map((g) => <span class="meta-tag">#{g}</span>),
   ].filter(Boolean)
   return (
-    <SwipeRow
-      onRight={() => toggle(t)}
-      onLeft={t.done ? undefined : () => dateSheet.set(t)}
-      right={
-        <>
-          <Icon name="check" />
-          {t.done ? '恢复' : '完成'}
-        </>
-      }
-      left={
-        <>
-          改期
-          <Icon name="calendar" />
-        </>
-      }
-    >
-      <div class={cx('task', t.done && 'done')} onClick={() => taskSheet.set(t)} role="button" tabIndex={0}>
-        <Check done={t.done} onToggle={() => toggle(t)} label={t.done ? '标记为未完成' : '完成'} />
-        <div class="task-main">
-          <div class="task-text">{t.text || t.key}</div>
-          {meta.length > 0 && <div class="task-meta">{meta}</div>}
-        </div>
+    <div class={cx('task-wrap', state === 'leaving' && 'leaving')}>
+      <div class="task-clip">
+        <SwipeRow
+          onRight={() => toggle(t)}
+          onLeft={done ? undefined : () => dateSheet.set(t)}
+          right={
+            <>
+              <Icon name="check" />
+              {done ? '恢复' : '完成'}
+            </>
+          }
+          left={
+            <>
+              改期
+              <Icon name="calendar" />
+            </>
+          }
+        >
+          <div class={cx('task', done && 'done')} onClick={() => taskSheet.set(t)} role="button" tabIndex={0}>
+            <Check done={done} onToggle={() => toggle(t)} label={done ? '标记为未完成' : '完成'} />
+            <div class="task-main">
+              <div class="task-text">{t.text || t.key}</div>
+              {meta.length > 0 && <div class="task-meta">{meta}</div>}
+            </div>
+          </div>
+        </SwipeRow>
       </div>
-    </SwipeRow>
+    </div>
   )
 }

@@ -1,67 +1,65 @@
 /* ────────────────────────────────────────────
-   Life Log v2 — 精致原生 · 墨绿
-   层级靠底色深浅，不靠描边；圆角：卡片 20 / 行 14 / 弹层 28
+   Life Log v3 — 晨雾
+   安静、克制：纯白的纸，一点雾蓝。不用卡片、不用阴影，靠留白分组。
+   界面用系统黑体；「你写的字」用霞鹜文楷。
    ──────────────────────────────────────────── */
 
 :root {
-  --bg: #f3f4f1;
-  --surface: #ffffff;
-  --surface-2: #eef0ec;
-  --surface-3: #e3e7e1;
-  --text: #191c1a;
-  --text-2: #565d58;
-  --text-3: #7d857f;
-  --sep: rgba(25, 28, 26, 0.08);
-  --accent: #2f7d5b;
-  --accent-strong: #256a4c;
+  --bg: #e8ecf2; /* 淡雾蓝底（B 档） */
+  --side: #dfe4eb; /* 桌面端侧栏 */
+  --group: #ffffff; /* 白色圆角分组 */
+  --fill: #f0f2f5; /* 白色块里的输入框、按钮底 */
+  --fill-2: #e4e8ee;
+  --text: #1c1f24;
+  --text-2: #4e545e;
+  --text-3: #6b717c;
+  --text-4: #a3a9b3;
+  --line: rgba(28, 31, 36, 0.09);
+  --accent: #4e73ab;
+  --accent-strong: #3f659e;
+  --accent-soft: #e3eaf5;
   --on-accent: #ffffff;
-  --accent-soft: #dceee3;
-  --on-accent-soft: #134a31;
-  --danger: #c23b3b;
-  --mood: #c46a1f;
-  --energy: #3a6fd8;
-  --scrim: rgba(12, 16, 14, 0.36);
-  --shadow-1: 0 1px 2px rgba(20, 30, 24, 0.04);
-  --shadow-2: 0 10px 30px rgba(20, 30, 24, 0.14), 0 2px 6px rgba(20, 30, 24, 0.06);
-  --inverse: #2b302d;
-  --on-inverse: #eff3f0;
+  --late: #b4554a; /* 唯一的警示色：逾期 */
+  --mood: #c07a45;
+  --energy: #4c78be;
+  --check: #b9bfc8;
+  --scrim: rgba(18, 24, 34, 0.32);
+  --float: 0 6px 18px rgba(40, 60, 100, 0.22), 0 1px 3px rgba(40, 60, 100, 0.14);
+  --sheet-shadow: 0 -8px 40px rgba(20, 30, 50, 0.14);
+  --r-group: 14px;
 
-  --font: Roboto, system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
-  --mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
-  --r-card: 20px;
-  --r-row: 14px;
-  --r-sheet: 28px;
-  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --nav-h: 80px;
+  --font: system-ui, -apple-system, Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  --ease: cubic-bezier(0.25, 0.8, 0.25, 1);
+  --col: 640px;
+  --tab-h: 58px;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
-  --col: 760px;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0e100f;
-    --surface: #1a1d1b;
-    --surface-2: #242826;
-    --surface-3: #2e3330;
-    --text: #e7ebe8;
-    --text-2: #a9b0ab;
-    --text-3: #7a827c;
-    --sep: rgba(255, 255, 255, 0.07);
-    --accent: #5fbf8f;
-    --accent-strong: #7ccfa4;
-    --on-accent: #05150d;
-    --accent-soft: #1d3a2b;
-    --on-accent-soft: #bfe8d0;
-    --danger: #f07167;
-    --mood: #d07a30;
-    --energy: #5b8ce6;
+    --bg: #0f1216;
+    --side: #13171c;
+    --group: #1b1f26;
+    --fill: #252a33;
+    --fill-2: #2d333d;
+    --text: #e6e9ee;
+    --text-2: #b0b6c0;
+    --text-3: #8a919c;
+    --text-4: #59606b;
+    --line: rgba(255, 255, 255, 0.07);
+    --accent: #8aa9d8;
+    --accent-strong: #a3bce2;
+    --accent-soft: #22304a;
+    --on-accent: #0f1622;
+    --late: #df8c82;
+    --mood: #c08048;
+    --energy: #6a8fd0;
+    --check: #4f5662;
     --scrim: rgba(0, 0, 0, 0.55);
-    --shadow-1: none;
-    --shadow-2: 0 12px 36px rgba(0, 0, 0, 0.5);
-    --inverse: #e3e8e4;
-    --on-inverse: #1a1d1b;
+    --float: 0 6px 24px rgba(0, 0, 0, 0.55);
+    --sheet-shadow: 0 -8px 40px rgba(0, 0, 0, 0.55);
     color-scheme: dark;
   }
 }
@@ -78,10 +76,10 @@ body {
   min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
-  font: 400 16px/1.55 var(--font);
+  font: 400 16px/1.5 var(--font);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
+  text-autospace: normal;
 }
 body.sheet-open {
   overflow: hidden;
@@ -100,7 +98,7 @@ button {
 }
 button:disabled {
   cursor: default;
-  opacity: 0.45;
+  opacity: 0.4;
 }
 input,
 textarea {
@@ -108,16 +106,16 @@ textarea {
   color: inherit;
 }
 ::placeholder {
-  color: var(--text-3);
+  color: var(--text-4);
   opacity: 1;
 }
 ::selection {
-  background: color-mix(in oklab, var(--accent) 28%, transparent);
+  background: color-mix(in oklab, var(--accent) 24%, transparent);
 }
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid color-mix(in oklab, var(--accent) 60%, transparent);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: 6px;
 }
 [hidden] {
   display: none !important;
@@ -126,29 +124,56 @@ textarea {
   flex: none;
   display: block;
 }
-.muted {
-  color: var(--text-3);
-}
-.over {
-  color: var(--danger);
-}
-code {
-  font: 0.88em var(--mono);
-  background: var(--surface-2);
-  padding: 1px 5px;
-  border-radius: 6px;
-}
 
+/* ───── 页面切换：进入下一层从右推入，返回从左 ───── */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 0.18s;
+  animation-duration: 0.26s;
   animation-timing-function: var(--ease);
+}
+:root[data-nav='push']::view-transition-old(root) {
+  animation-name: vt-out-left;
+}
+:root[data-nav='push']::view-transition-new(root) {
+  animation-name: vt-in-right;
+}
+:root[data-nav='pop']::view-transition-old(root) {
+  animation-name: vt-out-right;
+}
+:root[data-nav='pop']::view-transition-new(root) {
+  animation-name: vt-in-left;
+}
+@keyframes vt-out-left {
+  to {
+    transform: translateX(-18%);
+    opacity: 0;
+  }
+}
+@keyframes vt-in-right {
+  from {
+    transform: translateX(22%);
+    opacity: 0;
+  }
+}
+@keyframes vt-out-right {
+  to {
+    transform: translateX(18%);
+    opacity: 0;
+  }
+}
+@keyframes vt-in-left {
+  from {
+    transform: translateX(-22%);
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
-  *::after {
+  *::after,
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }

@@ -6,69 +6,65 @@ import { SyncPill } from './SyncPill'
 
 interface Props {
   title: string
+  /** 标题前的小图标（雾蓝），或任意节点（如进度饼图） */
+  icon?: string | ComponentChildren
   subtitle?: ComponentChildren
-  back?: { href: string; label: string }
+  /** 子页面的返回地址；四个主页不传，没有返回箭头 */
+  back?: { href: string; label?: string } | false
   actions?: ComponentChildren
   children: ComponentChildren
   class?: string
 }
 
-/** 大标题页面：滚动后大标题收进顶栏 */
-export function Page({ title, subtitle, back, actions, children, class: cls }: Props) {
+/** Things 式页面：左上「‹」，大标题配图标；滚动后标题收进顶栏 */
+export function Page({ title, icon, subtitle, back, actions, children, class: cls }: Props) {
   const sentinel = useRef<HTMLDivElement>(null)
   const [compact, setCompact] = useState(false)
   useEffect(() => {
     const el = sentinel.current
     if (!el) return
-    const io = new IntersectionObserver(([e]) => setCompact(!e.isIntersecting), { rootMargin: '-56px 0px 0px 0px' })
+    const io = new IntersectionObserver(([e]) => setCompact(!e.isIntersecting), { rootMargin: '-52px 0px 0px 0px' })
     io.observe(el)
     return () => io.disconnect()
   }, [])
+  const b = back || null
 
   return (
     <div class={cx('page', cls)}>
-      <header class={cx('appbar', compact && 'compact')}>
-        <div class="appbar-side">
-          {back && (
-            <a class="appbar-back" href={back.href}>
-              <Icon name="back" />
-              <span>{back.label}</span>
+      <header class={cx('topbar', compact && 'compact')}>
+        <div class="topbar-side">
+          {b && (
+            <a class="back" href={b.href} aria-label={b.label ?? '返回'}>
+              <Icon name="back" size={24} />
+              {b.label && <span>{b.label}</span>}
             </a>
           )}
         </div>
-        <div class="appbar-title">{title}</div>
-        <div class="appbar-side end">
-          {actions}
+        <div class="topbar-title">{title}</div>
+        <div class="topbar-side end">
           <SyncPill />
+          {actions}
         </div>
       </header>
-      <div class="large-title">
-        <h1>{title}</h1>
-        {subtitle && <div class="subtitle">{subtitle}</div>}
+      <div class="head">
+        <h1>
+          {icon && <span class="head-icon">{typeof icon === 'string' ? <Icon name={icon} size={26} /> : icon}</span>}
+          <span>{title}</span>
+        </h1>
+        {subtitle && <div class="head-sub">{subtitle}</div>}
       </div>
-      <div ref={sentinel} class="title-sentinel" />
-      <div class="page-body">{children}</div>
+      <div ref={sentinel} class="sentinel" />
+      <div class="body">{children}</div>
     </div>
   )
 }
 
-export function Card({
-  title,
-  action,
-  children,
-  class: cls,
-  onClick,
-}: {
-  title?: ComponentChildren
-  action?: ComponentChildren
-  children?: ComponentChildren
-  class?: string
-  onClick?: () => void
-}) {
+/** 分组小标题 */
+export function Section({ title, action, children, class: cls }: { title?: ComponentChildren; action?: ComponentChildren; children?: ComponentChildren; class?: string }) {
   return (
-    <section class={cx('card', onClick && 'tappable', cls)} onClick={onClick}>
+    <section class={cx('section', cls)}>
       {(title || action) && (
-        <div class="card-head">
+        <div class="section-head">
           <h2>{title}</h2>
           {action}
         </div>
@@ -78,6 +74,27 @@ export function Card({
   )
 }
 
-export function Empty({ children }: { children: ComponentChildren }) {
-  return <p class="empty">{children}</p>
+/** 兼容旧调用：不再画卡片，只是一个分组 */
+export function Card({ title, action, children, class: cls, onClick }: { title?: ComponentChildren; action?: ComponentChildren; children?: ComponentChildren; class?: string; onClick?: () => void }) {
+  return (
+    <section class={cx('section', onClick && 'tappable', cls)} onClick={onClick}>
+      {(title || action) && (
+        <div class="section-head">
+          <h2>{title}</h2>
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  )
+}
+
+/** 空状态：一个很淡的大图标 + 一行文楷 */
+export function Empty({ children, icon }: { children: ComponentChildren; icon?: string }) {
+  return (
+    <div class="empty">
+      {icon && <Icon name={icon} size={44} />}
+      <p>{children}</p>
+    </div>
+  )
 }
