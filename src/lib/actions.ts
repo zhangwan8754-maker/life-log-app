@@ -1,5 +1,5 @@
 /** 任务相关的用户动作 + 全局弹层状态 */
-import { ymd } from './dates'
+import { dayPath, ymd } from './dates'
 import { store } from './store'
 import { INBOX, type Task } from './todo'
 import { Box, haptic, toast } from './ui'
@@ -64,4 +64,40 @@ export function remove(t: Task) {
 
 export function add(text: string, group = INBOX, date = '') {
   store.enqueue(P, { kind: 'task.add', text, group, date })
+}
+
+// ───── 速记 ─────
+
+export interface NoteRef {
+  date: string
+  time: string
+  text: string
+}
+export const noteSheet = new Box<NoteRef | null>(null)
+
+export function editNote(n: NoteRef, next: string): NoteRef {
+  const clean = next.replace(/\s*\n\s*/g, ' ').trim()
+  if (!clean || clean === n.text) return n
+  store.enqueue(dayPath(n.date), { kind: 'note.edit', date: n.date, time: n.time, text: n.text, next: clean })
+  return { ...n, text: clean }
+}
+
+export function deleteNote(n: NoteRef) {
+  store.enqueue(dayPath(n.date), { kind: 'note.delete', date: n.date, time: n.time, text: n.text })
+  toast('已删除这条速记', {
+    label: '撤销',
+    run: () => store.enqueue(dayPath(n.date), { kind: 'note.restore', date: n.date, time: n.time, text: n.text }),
+  })
+}
+
+// ───── 提炼为思想：把速记带进新建思想页 ─────
+
+let draft: { body: string; from: string } | null = null
+export const setDraft = (d: typeof draft) => {
+  draft = d
+}
+export const takeDraft = () => {
+  const d = draft
+  draft = null
+  return d
 }

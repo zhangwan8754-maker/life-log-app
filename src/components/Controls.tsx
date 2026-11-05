@@ -5,11 +5,29 @@ import { cx } from '../lib/ui'
 import { Icon } from './Icon'
 
 /** 文字标签切换：选中的字深、其余灰，下面一道细线 */
-export function Tabs<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
+export function Tabs<T extends string>({
+  value,
+  options,
+  onChange,
+  keepFocus,
+}: {
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (v: T) => void
+  /** 点标签时不抢走输入框的焦点（键盘不会收起再弹出） */
+  keepFocus?: boolean
+}) {
   return (
     <div class="tabs" role="tablist">
       {options.map((o) => (
-        <button type="button" role="tab" aria-selected={o.value === value} class={cx(o.value === value && 'on')} onClick={() => onChange(o.value)}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={o.value === value}
+          class={cx(o.value === value && 'on')}
+          onMouseDown={keepFocus ? (e) => e.preventDefault() : undefined}
+          onClick={() => onChange(o.value)}
+        >
           {o.label}
         </button>
       ))}

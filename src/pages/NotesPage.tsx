@@ -6,7 +6,8 @@ import { cx, go } from '../lib/ui'
 import { Chip, Tabs } from '../components/Controls'
 import { Icon } from '../components/Icon'
 import { Empty, Page } from '../components/Page'
-import { setDraft, tagsOf, titleOf } from './ThoughtPage'
+import { NoteRow } from '../components/NoteSheet'
+import { tagsOf, titleOf } from './ThoughtPage'
 
 const excerpt = (md: string) => thoughtBody(md).replace(/^[\s>#*-]+/gm, '').replace(/[*_`[\]]/g, '').replace(/\s+/g, ' ').slice(0, 80)
 
@@ -113,22 +114,7 @@ function Stream({ days }: { days: { date: string; md: string }[] }) {
           <div class="group">
             <ul class="notes in-group">
               {d.notes.map((n) => (
-                <li>
-                  <time>{n.time}</time>
-                  <span>{n.text}</span>
-                  <button
-                    type="button"
-                    class="icon-btn tiny"
-                    aria-label="提炼为思想"
-                    title="提炼为思想"
-                    onClick={() => {
-                      setDraft({ body: n.text, from: d.date })
-                      go('#/thought/new')
-                    }}
-                  >
-                    <Icon name="distill" size={17} />
-                  </button>
-                </li>
+                <NoteRow date={d.date} note={n} />
               ))}
             </ul>
           </div>

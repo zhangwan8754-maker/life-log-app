@@ -111,12 +111,14 @@ export interface Note {
   text: string
 }
 
+const noteRe = /^[-*]\s+(?:(\d{1,2}:\d{2})\s+)?(.*)$/
+
 export function parseNotes(md: string): Note[] {
   const sec = getSection(md, '速记')
   if (!sec) return []
   const out: Note[] = []
   for (const l of sec.split('\n')) {
-    const m = l.match(/^[-*]\s+(?:(\d{1,2}:\d{2})\s+)?(.*)$/)
+    const m = l.match(noteRe)
     if (m && m[2].trim()) out.push({ time: m[1] ?? '', text: m[2].trim() })
   }
   return out
@@ -124,6 +126,50 @@ export function parseNotes(md: string): Note[] {
 
 export function appendNote(md: string, time: string, text: string): string {
   return insertLine(md, '速记', `- ${time} ${oneLine(text)}`)
+}
+
+const noteLine = (time: string, text: string) => `- ${time ? `${time} ` : ''}${oneLine(text)}`
+
+/** 找到「速记」小节里第一条时间和内容都对得上的行 */
+function findNote(ls: string[], time: string, text: string): number {
+  const r = sectionRange(ls, '速记')
+  if (!r) return -1
+  for (let i = r[0] + 1; i < r[1]; i++) {
+    const m = ls[i].match(noteRe)
+    if (m && (m[1] ?? '') === time && m[2].trim() === text) return i
+  }
+  return -1
+}
+
+export function editNote(md: string, time: string, text: string, next: string): string {
+  const ls = lines(md)
+  const i = findNote(ls, time, text)
+  if (i < 0 || !oneLine(next)) return md
+  ls[i] = noteLine(time, next)
+  return ls.join('\n')
+}
+
+export function deleteNote(md: string, time: string, text: string): string {
+  const ls = lines(md)
+  const i = findNote(ls, time, text)
+  if (i < 0) return md
+  ls.splice(i, 1)
+  return ls.join('\n')
+}
+
+/** 撤销删除：按时间顺序插回原来的位置 */
+export function restoreNote(md: string, time: string, text: string): string {
+  const ls = lines(md)
+  const r = sectionRange(ls, '速记')
+  if (!r || findNote(ls, time, text) >= 0) return r ? md : appendNote(md, time, text)
+  for (let i = r[0] + 1; i < r[1]; i++) {
+    const m = ls[i].match(noteRe)
+    if (m && m[2].trim() && (m[1] ?? '') > time) {
+      ls.splice(i, 0, noteLine(time, text))
+      return ls.join('\n')
+    }
+  }
+  return insertLine(md, '速记', noteLine(time, text))
 }
 
 export const oneLine = (s: string) => s.replace(/\s*\n\s*/g, ' ').trim()

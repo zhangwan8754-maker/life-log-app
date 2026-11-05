@@ -878,14 +878,29 @@
   margin: 0;
   padding: 0;
 }
-.notes li {
+.notes li + li {
+  border-top: 1px solid var(--line);
+}
+.note-row {
   display: flex;
   align-items: flex-start;
   gap: 14px;
+  width: 100%;
   padding: 11px 0;
+  text-align: left;
+  transition: opacity 0.12s;
 }
-.notes li + li {
-  border-top: 1px solid var(--line);
+.note-row:active {
+  opacity: 0.55;
+}
+.note-more {
+  flex: none;
+  margin-top: 3px;
+  color: var(--text-3);
+}
+.btn-pair {
+  display: inline-flex;
+  gap: 18px;
 }
 .notes time {
   flex: none;
@@ -900,9 +915,6 @@
   font-size: 18px;
   line-height: 1.6;
   overflow-wrap: anywhere;
-}
-.notes .icon-btn {
-  margin-top: -2px;
 }
 .note-add {
   margin-top: 6px;
@@ -1037,10 +1049,16 @@
   font-size: 21px;
 }
 .quick-hint {
+  /* 和「今天 / 收件箱」那一行一样高：切换待办和速记时弹层不会跳 */
+  display: flex;
+  align-items: center;
+  min-height: 36px;
   margin: 0;
+  overflow: hidden;
   font-size: 15px;
-  line-height: 1.7;
   color: var(--text-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .attrs {
   display: flex;

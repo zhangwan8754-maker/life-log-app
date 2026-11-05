@@ -13,6 +13,9 @@ interface Props {
   label?: string
 }
 
+/** 当前打开的弹层层数 */
+let depth = 0
+
 /** 底部弹层：手机上从底部滑出、可下拉关闭；桌面上是居中对话框 */
 export function Sheet({ open, onClose, title, children, full, label }: Props) {
   const [mounted, setMounted] = useState(open)
@@ -33,12 +36,19 @@ export function Sheet({ open, onClose, title, children, full, label }: Props) {
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    // 弹层可以叠在弹层上：Esc 只关最上面那个；全部关掉后才恢复页面滚动
+    const me = ++depth
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && me === depth) {
+        e.stopImmediatePropagation()
+        onClose()
+      }
+    }
     addEventListener('keydown', onKey)
     document.body.classList.add('sheet-open')
     return () => {
       removeEventListener('keydown', onKey)
-      document.body.classList.remove('sheet-open')
+      if (--depth === 0) document.body.classList.remove('sheet-open')
     }
   }, [open])
 

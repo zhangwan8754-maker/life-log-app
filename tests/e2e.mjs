@@ -180,7 +180,8 @@ try {
   const todo = () => gh.read('todo.md') ?? ''
   const day = () => gh.read(DAY_PATH) ?? ''
   const fab = page.locator('button.fab')
-  const sheet = page.locator('.sheet-root.shown')
+  // 弹层可以叠放：总是操作最上面那一个
+  const sheet = page.locator('.sheet-root.shown').last()
 
   await step('错误令牌给出提示', async () => {
     await page.goto(BASE)
@@ -284,6 +285,27 @@ try {
     await page.keyboard.press('Escape')
   })
 
+  await step('速记：点开可以编辑、删除，删除可以撤销', async () => {
+    await openNotes()
+    await sheet.locator('.note-row', { hasText: '电脑上记的' }).click()
+    await sheet.locator('.sheet-head h2', { hasText: /^速记 · \d{2}:\d{2}$/ }).waitFor()
+    await sheet.locator('textarea[aria-label=速记内容]').fill('电脑上记的（改过）')
+    await sheet.locator('.text-btn', { hasText: '完成' }).click()
+    await until(() => /- \d{2}:\d{2} 电脑上记的（改过）\n/.test(day()), '编辑速记')
+    await sheet.locator('.note-row', { hasText: '电脑上记的（改过）' }).waitFor()
+
+    await sheet.locator('.note-row', { hasText: '手机上记的' }).click()
+    await sheet.locator('.text-btn.danger', { hasText: '删除' }).click()
+    await until(() => !day().includes('手机上记的'), '删除速记')
+    assert.ok(day().includes('第一条速记') && day().includes('电脑上记的（改过）'), '其他速记不受影响')
+    assert.equal(await sheet.locator('.note-row', { hasText: '手机上记的' }).count(), 0)
+    await page.locator('.toast button', { hasText: '撤销' }).click()
+    await until(() => day().includes('- 07:00 手机上记的'), '撤销删除')
+    assert.ok(day().indexOf('手机上记的') < day().indexOf('第一条速记'), '按时间插回原位')
+    assert.ok(gh.puts.some((p) => p.message.startsWith('删除速记')), '删除有单独的提交说明')
+    await page.keyboard.press('Escape')
+  })
+
   await step('离线记录，联网后自动同步', async () => {
     await ctx.setOffline(true)
     await page.waitForTimeout(300)
@@ -344,7 +366,8 @@ try {
   await step('从速记提炼为思想', async () => {
     await tab('今天')
     await openNotes()
-    await sheet.locator('.notes li', { hasText: '第一条速记' }).locator('button').click()
+    await sheet.locator('.note-row', { hasText: '第一条速记' }).click()
+    await sheet.locator('.text-btn', { hasText: '提炼为思想' }).click()
     await page.waitForURL(/#\/thought\/new/)
     assert.equal(await page.inputValue('.body-input'), '第一条速记')
     await page.fill('.title-input', '记录本身就是思考')
@@ -411,6 +434,37 @@ try {
     await page.fill('textarea.source-input', v.replace('## 价值观\n-', '## 价值观\n- 自由'))
     await page.locator('.topbar .text-btn', { hasText: '完成' }).click()
     await until(() => gh.read('me.md')?.includes('## 价值观\n- 自由'), 'me.md')
+  })
+
+  await step('手机上切换「待办 / 速记」：焦点留在输入框，弹层高度不变', async () => {
+    const gh2 = new FakeGitHub()
+    seedV1(gh2)
+    const { ctx: c2, page: p2, errors: e2 } = await newPage(gh2, { ...devices['Pixel 7'] })
+    await connect(p2)
+    await p2.locator('button.fab').tap()
+    const s2 = p2.locator('.sheet-root.shown').last()
+    const input = s2.locator('.quick-input')
+    await until(() => input.evaluate((el) => el === document.activeElement), '自动聚焦')
+    await input.fill('先打几个字')
+    const before = (await s2.locator('.sheet').boundingBox()).height
+    const focused = () => input.evaluate((el) => el === document.activeElement)
+    // 键盘「跳」= 输入框先失焦（键盘收起）再聚焦（键盘弹出）。只看最后的状态不够，要数失焦次数
+    await input.evaluate((el) => {
+      ;window.__blurs = 0
+      el.addEventListener('blur', () => window.__blurs++)
+    })
+    await s2.locator('.tabs button', { hasText: '速记' }).tap()
+    assert.equal(await p2.evaluate(() => window.__blurs), 0, '切到速记时输入框失焦了（键盘会收起再弹出）')
+    assert.ok(await focused(), '切到速记后焦点还在输入框')
+    assert.equal(await input.inputValue(), '先打几个字', '已输入的字还在')
+    const after = (await s2.locator('.sheet').boundingBox()).height
+    assert.ok(Math.abs(after - before) <= 2, `弹层高度变化 ${before} → ${after}`)
+    await s2.locator('.tabs button', { hasText: '待办' }).tap()
+    assert.equal(await p2.evaluate(() => window.__blurs), 0, '切回待办时输入框失焦了')
+    assert.ok(await focused(), '切回待办后焦点还在输入框')
+    assert.equal(await input.getAttribute('enterkeyhint'), 'done')
+    assert.deepEqual(e2, [])
+    await c2.close()
   })
 
   await step('刷新后数据来自缓存且一致', async () => {
@@ -500,6 +554,15 @@ try {
         await p.locator('.attr').first().click()
         await p.waitForTimeout(250)
         await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-when.png`, import.meta.url).pathname })
+        await p.keyboard.press('Escape')
+        await p.waitForTimeout(300)
+        await p.locator('.status button', { hasText: '速记' }).click()
+        await p.waitForTimeout(450)
+        await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-notes.png`, import.meta.url).pathname })
+        await p.locator('.sheet-root.shown').last().locator('.note-row').first().click()
+        await p.waitForTimeout(450)
+        await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-note.png`, import.meta.url).pathname })
+        await p.keyboard.press('Escape')
         await p.keyboard.press('Escape')
         await p.waitForTimeout(300)
         assert.deepEqual(errs, [], `${name} ${scheme} 页面没有报错`)

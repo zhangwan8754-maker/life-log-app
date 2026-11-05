@@ -7,11 +7,14 @@
  */
 import { type Config, GitHub, HttpError } from './github'
 import * as idb from './idb'
-import { appendNote, newDay, setMeta, setSection } from './md'
+import { appendNote, deleteNote, editNote, newDay, restoreNote, setMeta, setSection } from './md'
 import * as T from './todo'
 
 export type OpArgs =
   | { kind: 'note'; date: string; time: string; text: string }
+  | { kind: 'note.edit'; date: string; time: string; text: string; next: string }
+  | { kind: 'note.delete'; date: string; time: string; text: string }
+  | { kind: 'note.restore'; date: string; time: string; text: string }
   | { kind: 'meta'; date: string; key: string; value: string }
   | { kind: 'journal'; date: string; text: string }
   | { kind: 'task.add'; text: string; group: string; date: string }
@@ -39,6 +42,9 @@ const legacyGroup = (s: string) => (s === '之后' ? T.SOMEDAY : T.INBOX)
 export function applyOp(c: string | null, op: OpArgs): string {
   switch (op.kind) {
     case 'note': return appendNote(c ?? newDay(op.date), op.time, op.text)
+    case 'note.edit': return editNote(c ?? newDay(op.date), op.time, op.text, op.next)
+    case 'note.delete': return deleteNote(c ?? newDay(op.date), op.time, op.text)
+    case 'note.restore': return restoreNote(c ?? newDay(op.date), op.time, op.text)
     case 'meta': return setMeta(c ?? newDay(op.date), op.key, op.value)
     case 'journal': return setSection(c ?? newDay(op.date), '日记', op.text)
     case 'task.add': return T.addTask(c, op.text, op.group, op.date)
@@ -69,7 +75,10 @@ function coalesceKey(op: Op): string | null {
 
 function label(op: Op): string {
   switch (op.kind) {
-    case 'note': return `速记 ${op.date}`
+    case 'note':
+    case 'note.edit':
+    case 'note.restore': return `速记 ${op.date}`
+    case 'note.delete': return `删除速记 ${op.date}`
     case 'meta': return `状态 ${op.date}`
     case 'journal': return `日记 ${op.date}`
     case 'write': return op.label

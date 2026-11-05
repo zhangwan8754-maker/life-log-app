@@ -11,7 +11,7 @@ import { Icon } from '../components/Icon'
 import { Empty, Page } from '../components/Page'
 import { Sheet } from '../components/Sheet'
 import { TaskRow } from '../components/TaskRow'
-import { setDraft } from './ThoughtPage'
+import { NoteRow } from '../components/NoteSheet'
 
 export function TodayPage({ date }: { date?: string }) {
   const today = useToday()
@@ -160,23 +160,7 @@ function NotesSheet({ open, date, md, editable, onClose }: { open: boolean; date
       {notes.length === 0 && <p class="sheet-sub">{editable ? '一闪而过的念头，随手记下。' : '这一天没有速记。'}</p>}
       <ul class="notes">
         {notes.map((n) => (
-          <li>
-            <time>{n.time}</time>
-            <span>{n.text}</span>
-            <button
-              type="button"
-              class="icon-btn tiny"
-              title="提炼为思想"
-              aria-label="提炼为思想"
-              onClick={() => {
-                onClose()
-                setDraft({ body: n.text, from: date })
-                go('#/thought/new')
-              }}
-            >
-              <Icon name="distill" size={17} />
-            </button>
-          </li>
+          <NoteRow date={date} note={n} />
         ))}
       </ul>
       {editable && (

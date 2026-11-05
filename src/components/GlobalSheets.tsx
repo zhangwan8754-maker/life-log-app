@@ -7,6 +7,7 @@ import { INBOX, withDate, type Group, type Task } from '../lib/todo'
 import { cx, go, toast, useBox } from '../lib/ui'
 import { Pie, Tabs, WhenPicker, whenLabel } from './Controls'
 import { Icon } from './Icon'
+import { NoteSheet } from './NoteSheet'
 import { Sheet } from './Sheet'
 
 const stripDate = (key: string) => withDate(key, '')
@@ -111,6 +112,7 @@ function QuickEntry() {
       <form class="quick" onSubmit={submit}>
         <div class="quick-top">
           <Tabs
+            keepFocus
             value={mode}
             options={[
               { value: 'task', label: '待办' },
@@ -118,7 +120,8 @@ function QuickEntry() {
             ]}
             onChange={(m) => {
               setMode(m)
-              setTimeout(() => input.current?.focus(), 30)
+              // 正常情况下焦点一直在输入框上；只有键盘原本就收起时才重新聚焦
+              if (document.activeElement !== input.current) input.current?.focus()
             }}
           />
           <button
@@ -138,14 +141,14 @@ function QuickEntry() {
           value={text}
           onInput={(e) => setText((e.target as HTMLInputElement).value)}
           placeholder={mode === 'task' ? '新的待办' : '此刻在想什么'}
-          enterKeyHint={mode === 'task' ? 'done' : 'send'}
+          enterKeyHint="done"
           autocomplete="off"
           aria-label={mode === 'task' ? '新的待办' : '速记'}
         />
         {mode === 'task' ? (
           <Attrs date={date} group={group} today={today} onDate={setDate} onGroup={setGroup} />
         ) : (
-          <p class="quick-hint">记进今天的速记。以后可以在「笔记」里把它提炼成一条思想。</p>
+          <p class="quick-hint">记进今天的速记，之后可以提炼成思想</p>
         )}
         {added.length > 0 && (
           <ul class="added">
@@ -259,6 +262,7 @@ export function GlobalSheets() {
       <QuickEntry />
       <TaskSheet />
       <DateSheet />
+      <NoteSheet />
     </>
   )
 }

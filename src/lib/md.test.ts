@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { isoWeek } from './dates'
 import {
-  appendNote, getMeta, getSection, newDay,
+  appendNote, deleteNote, editNote, getMeta, getSection, newDay, restoreNote,
   newThought, parseNotes, setMeta, setSection, setThoughtBody, thoughtBody,
 } from './md'
 
@@ -37,6 +37,34 @@ describe('每日文件', () => {
   })
   it('缺少小节时追加', () => {
     expect(parseNotes(appendNote('手写的文件', '09:00', 'hi'))).toEqual([{ time: '09:00', text: 'hi' }])
+  })
+})
+
+describe('速记：编辑 / 删除 / 撤销', () => {
+  const base = appendNote(appendNote(appendNote(newDay('2026-11-05'), '08:12', '第一条'), '13:40', '第二条'), '21:05', '第三条')
+  const texts = (md: string) => parseNotes(md).map((n) => `${n.time} ${n.text}`)
+  it('编辑只改对应那一条', () => {
+    const md = editNote(base, '13:40', '第二条', '改过的\n第二条')
+    expect(texts(md)).toEqual(['08:12 第一条', '13:40 改过的 第二条', '21:05 第三条'])
+    expect(editNote(base, '13:40', '不存在', 'x')).toBe(base)
+    expect(editNote(base, '13:40', '第二条', '   ')).toBe(base)
+  })
+  it('删除后撤销，按时间插回原位', () => {
+    const del = deleteNote(base, '13:40', '第二条')
+    expect(texts(del)).toEqual(['08:12 第一条', '21:05 第三条'])
+    expect(texts(restoreNote(del, '13:40', '第二条'))).toEqual(['08:12 第一条', '13:40 第二条', '21:05 第三条'])
+    expect(restoreNote(base, '13:40', '第二条')).toBe(base) // 已经在了就不重复
+    expect(texts(restoreNote(deleteNote(base, '21:05', '第三条'), '21:05', '第三条'))).toEqual(texts(base))
+  })
+  it('只删一条重复的，日记不受影响', () => {
+    let md = setSection(appendNote(base, '13:40', '第二条'), '日记', '- 13:40 第二条（日记里的同样文字）')
+    md = deleteNote(md, '13:40', '第二条')
+    expect(texts(md)).toEqual(['08:12 第一条', '21:05 第三条', '13:40 第二条'])
+    expect(getSection(md, '日记')).toBe('- 13:40 第二条（日记里的同样文字）')
+  })
+  it('没有时间的速记（手写的）也能删', () => {
+    const md = '## 速记\n\n- 手写的一条\n- 09:00 另一条\n'
+    expect(texts(deleteNote(md, '', '手写的一条'))).toEqual(['09:00 另一条'])
   })
 })
 

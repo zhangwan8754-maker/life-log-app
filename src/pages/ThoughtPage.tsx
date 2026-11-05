@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { takeDraft } from '../lib/actions'
 import { hm, ymd } from '../lib/dates'
 import { useAutoGrow, useFile, useStore } from '../lib/hooks'
 import { getMeta, newThought, safeTitle, setMeta, setThoughtBody, stripFrontmatter, thoughtBody } from '../lib/md'
@@ -6,8 +7,6 @@ import { store } from '../lib/store'
 import { debounce, markdown } from '../lib/ui'
 import { Page, Empty } from '../components/Page'
 
-let draft: { body: string; from: string } | null = null
-export const setDraft = (d: typeof draft) => (draft = d)
 
 export const titleOf = (path: string, md?: string | null) =>
   (md && stripFrontmatter(md).match(/^\s*# (.+)$/m)?.[1]?.trim()) || path.replace(/^.*\//, '').replace(/\.md$/, '')
@@ -19,11 +18,7 @@ export function ThoughtPage({ arg }: { arg: string }) {
   useStore()
   const isNew = arg === 'new'
   const [path, setPath] = useState(isNew ? '' : arg)
-  const [d] = useState(() => {
-    const x = isNew ? draft : null
-    draft = null
-    return x
-  })
+  const [d] = useState(() => (isNew ? takeDraft() : null))
   const md = useFile(path || null)
   const [editing, setEditing] = useState(isNew)
   const [title, setTitle] = useState('')
