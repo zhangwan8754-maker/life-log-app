@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'preact/hooks'
 import { useAutoGrow, useFile } from '../lib/hooks'
+import { emptyMe } from '../lib/me'
 import { stripFrontmatter } from '../lib/md'
 import { store } from '../lib/store'
 import { debounce, markdown } from '../lib/ui'
 import { Empty, Page } from '../components/Page'
-
-const TEMPLATE_ME = `---\nupdated:\n---\n# 我是谁\n\n## 价值观\n-\n\n## 长期目标（3–5 年）\n-\n\n## 今年\n-\n\n## 原则\n-\n\n## 当前关注\n-\n\n## 已知的我\n-\n`
 
 const titleFor = (path: string) => {
   if (path === 'me.md') return '我是谁'
@@ -39,7 +38,7 @@ export function FilePage({ path }: { path: string }) {
       onClick={() => {
         if (editing) save.flush()
         else {
-          setText(md ?? (path === 'me.md' ? TEMPLATE_ME : ''))
+          setText(md ?? (path === 'me.md' ? emptyMe() : ''))
           setTimeout(() => ref.current?.focus(), 50)
         }
         setEditing(!editing)
@@ -53,8 +52,8 @@ export function FilePage({ path }: { path: string }) {
   return (
     <Page
       title={titleFor(path)}
-      subtitle={dirty ? '编辑中' : path === 'me.md' ? 'AI 复盘时最先读的一页' : undefined}
-      back={{ href: '#/review', label: '复盘' }}
+      subtitle={dirty ? '编辑中' : path === 'me.md' ? '整页 Markdown 原文' : undefined}
+      back={path === 'me.md' ? { href: '#/me', label: '我是谁' } : { href: '#/review', label: '复盘' }}
       actions={
         <>
           {week && !editing && (

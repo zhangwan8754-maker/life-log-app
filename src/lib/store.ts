@@ -8,6 +8,7 @@
 import { type Config, GitHub, HttpError } from './github'
 import * as idb from './idb'
 import { appendNote, deleteNote, editNote, newDay, restoreNote, setMeta, setSection } from './md'
+import { setMeField } from './me'
 import * as T from './todo'
 
 export type OpArgs =
@@ -33,6 +34,7 @@ export type OpArgs =
   | { kind: 'todo.toggle'; key: string; today: string }
   | { kind: 'todo.move'; key: string; section: string }
   | { kind: 'todo.delete'; key: string }
+  | { kind: 'me.set'; section: string; sub: string; text: string; date: string }
   | { kind: 'write'; content: string; label: string }
 
 export type Op = OpArgs & { id: string; path: string }
@@ -62,6 +64,7 @@ export function applyOp(c: string | null, op: OpArgs): string {
     case 'todo.toggle': return T.toggleTask(c, op.key, op.today)
     case 'todo.move': return T.moveTask(c, op.key, legacyGroup(op.section))
     case 'todo.delete': return T.deleteTask(c, op.key)
+    case 'me.set': return setMeField(c, op.section, op.sub, op.text, op.date)
     case 'write': return op.content
   }
 }
@@ -70,6 +73,7 @@ export function applyOp(c: string | null, op: OpArgs): string {
 function coalesceKey(op: Op): string | null {
   if (op.kind === 'journal' || op.kind === 'write') return `${op.path}|${op.kind}`
   if (op.kind === 'meta') return `${op.path}|meta|${op.key}`
+  if (op.kind === 'me.set') return `${op.path}|me|${op.section}|${op.sub}`
   return null
 }
 
@@ -82,6 +86,7 @@ function label(op: Op): string {
     case 'meta': return `状态 ${op.date}`
     case 'journal': return `日记 ${op.date}`
     case 'write': return op.label
+    case 'me.set': return '我是谁'
     case 'todo.migrate': return '待办：升级格式'
     default: return op.kind.startsWith('project') ? '项目' : '待办'
   }

@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks'
 import { addDays, cnMonthDay } from '../lib/dates'
 import { dayMd, useFile, useStore, useToday, useTree } from '../lib/hooks'
 import { getMeta, score } from '../lib/md'
+import { parseMe } from '../lib/me'
 import { aiPrompt, reviewPath, weekOf, weekStats, type WeekStats } from '../lib/review'
 import { store } from '../lib/store'
 import { go, toast } from '../lib/ui'
@@ -43,6 +44,7 @@ export function ReviewPage() {
   useTree('days/', 'thoughts/', 'reviews/')
   const todo = useFile('todo.md') ?? ''
   const me = useFile('me.md') ?? ''
+  const meDoc = parseMe(me)
   const [metric, setMetric] = useState<Metric>('mood')
   const [year, setYear] = useState(Number(today.slice(0, 4)))
 
@@ -123,7 +125,7 @@ export function ReviewPage() {
             }
           }}
         />
-        <ListRow icon="person" label="我是谁" detail={me ? '' : '未填写'} href="#/file/me.md" chev />
+        <ListRow icon="person" label="我是谁" detail={meDoc.filled ? `${meDoc.filled}/${meDoc.total}` : '未填写'} href="#/me" chev />
         <ListRow icon="settings" label="设置" href="#/settings" chev />
       </div>
 

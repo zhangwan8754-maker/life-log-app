@@ -3,6 +3,7 @@ import { setDate } from '../lib/actions'
 import { addDays, cnMonthDay, shortWeekday } from '../lib/dates'
 import { dayMd, useFile, useToday, useTodo, useTree } from '../lib/hooks'
 import { getSection } from '../lib/md'
+import { termGoals } from '../lib/me'
 import { parseReview, reviewMarkdown, reviewPath, weekFromId, weekStats, type ReviewParts } from '../lib/review'
 import { store } from '../lib/store'
 import { allTasks, INBOX, SOMEDAY } from '../lib/todo'
@@ -221,7 +222,7 @@ function Reflect({ parts, update, stats }: { parts: ReviewParts; update: (p: Par
 
 function PlanNext({ today, me }: { today: string; me: string }) {
   const { groups } = useTodo()
-  const goals = getSection(me, '今年')?.replace(/^-\s*$/gm, '').trim()
+  const goals = termGoals(me)
   const mon = addDays(today, ((8 - new Date().getDay()) % 7) || 7)
   const week = Array.from({ length: 7 }, (_, i) => addDays(mon, i))
   const open = allTasks(groups).filter((t) => !t.done)
@@ -229,14 +230,14 @@ function PlanNext({ today, me }: { today: string; me: string }) {
   const candidates = open.filter((t) => !t.date && t.group !== SOMEDAY)
   return (
     <>
-      <p class="step-intro">对照今年的目标，挑出下周最重要的几件，排上日子。</p>
-      <p class="group-label">今年的目标</p>
+      <p class="step-intro">对照这学期的方向，挑出下周最重要的几件，排上日子。</p>
+      <p class="group-label">这学期的方向</p>
       <div class="group">
         {goals ? (
           <div class="prose group-text" dangerouslySetInnerHTML={{ __html: markdown(goals) }} />
         ) : (
           <p class="group-empty">
-            还没写。<a href="#/file/me.md">去「我是谁」里填上</a>，复盘时就能对照。
+            还没写。<a href="#/me">去「我是谁」里填上「方向 · 这学期」</a>，复盘时就能对照。
           </p>
         )}
       </div>

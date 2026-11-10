@@ -87,6 +87,10 @@ function seedV1(gh) {
 /** 截图用：近 100 天的示例数据 + 新版待办 */
 function seedSample(gh) {
   seedV1(gh)
+  gh.write(
+    'me.md',
+    `---\nupdated: ${TODAY}\n---\n# 我是谁\n\n## 现在\n\n在读学生，大三，计算机专业，在上海。\n正在学运维和英语。\n\n## 在乎\n\n### 让我有劲的\n\n把一件事从头搭起来；看到设计得很美的东西。\n\n### 耗我的\n\n### 好的一天\n\n睡够了，学了一点新东西，和在乎的人说了话。\n\n## 方向\n\n### 这学期\n\n- 过英语六级\n- 做完一个能上线的小项目\n\n### 毕业时\n\n### 更远\n\n## 做法\n\n### 验证过的\n\n### 借来的\n\n「慢即是快」——还没试过，先记在这。\n\n## 还没想清楚\n`,
+  )
   let r = 7
   const rnd = () => ((r = (r * 9301 + 49297) % 233280), r / 233280)
   const notes = ['散步时想清楚了下周的优先级', '读到一句话：慢即是快', '和朋友聊了很久', '把复杂问题拆小，立刻轻松很多', '午后犯困，下次少吃点']
@@ -426,14 +430,52 @@ try {
     assert.ok(clip.includes(`帮我复盘 ${WEEK}`) && clip.includes('读完 24 本书') && clip.includes('重新设计了 Life Log'))
   })
 
-  await step('编辑「我是谁」', async () => {
+  await step('我是谁：分栏填写，只改一栏，旧的空栏目被清掉', async () => {
     await page.locator('.main .row', { hasText: '我是谁' }).click()
-    await page.locator('.prose h2', { hasText: '价值观' }).waitFor()
-    await page.locator('.topbar .text-btn', { hasText: '编辑' }).click()
+    await page.waitForURL(/#\/me$/)
+    await page.locator('.head h1', { hasText: '我是谁' }).waitFor()
+    await page.locator('.head-sub', { hasText: '已填 0 / 10' }).waitFor()
+    // 旧模板里写过字的「今年」保留在「其他」里；空着的「价值观」不显示
+    await page.locator('.me-row.plain', { hasText: '读完 24 本书' }).waitFor()
+    assert.equal(await page.locator('.me-row', { hasText: '价值观' }).count(), 0)
+
+    await page.locator('.me-row.tap', { hasText: '这学期' }).click()
+    await sheet.locator('.sheet-sub', { hasText: '这学期结束时' }).waitFor()
+    await sheet.locator('textarea.me-edit').fill('过四级\n做完一个 ops 小项目')
+    await sheet.locator('.text-btn', { hasText: '完成' }).click()
+    await until(() => gh.read('me.md')?.includes('### 这学期\n\n过四级\n做完一个 ops 小项目\n\n### 毕业时'), '写入这学期')
+    const md = gh.read('me.md')
+    assert.match(md, new RegExp(`^---\\nupdated: ${TODAY}\\n---\\n# 我是谁\\n\\n## 现在\\n\\n## 在乎\\n\\n### 让我有劲的\\n`))
+    assert.ok(md.includes('## 今年\n\n- 读完 24 本书'), '写过字的旧栏目保留')
+    assert.ok(!md.includes('## 价值观'), '空的旧栏目清掉')
+    await page.locator('.head-sub', { hasText: '已填 1 / 10' }).waitFor()
+    await page.locator('.me-row.tap .me-text', { hasText: '做完一个 ops 小项目' }).waitFor()
+  })
+
+  await step('我是谁：仍然可以编辑整页原文', async () => {
+    await page.locator('.topbar .text-btn', { hasText: '编辑原文' }).click()
+    await page.waitForURL(/#\/file\/me\.md/)
+    await page.locator('.topbar .text-btn', { hasText: /^编辑$/ }).click()
     const v = await page.inputValue('textarea.source-input')
-    await page.fill('textarea.source-input', v.replace('## 价值观\n-', '## 价值观\n- 自由'))
+    await page.fill('textarea.source-input', v.replace('## 现在\n', '## 现在\n\n在读学生\n'))
     await page.locator('.topbar .text-btn', { hasText: '完成' }).click()
-    await until(() => gh.read('me.md')?.includes('## 价值观\n- 自由'), 'me.md')
+    await until(() => gh.read('me.md')?.includes('## 现在\n\n在读学生\n'), '原文保存')
+    await page.locator('.back').click()
+    await page.locator('.me-row.tap .me-text', { hasText: '在读学生' }).waitFor()
+    await page.locator('.head-sub', { hasText: '已填 2 / 10' }).waitFor()
+  })
+
+  await step('每周复盘和「复制给 AI」用新的「这学期」来对照', async () => {
+    await page.goto(BASE + `#/week/${WEEK}`)
+    await page.locator('.steps-dots button[aria-label=计划]').click()
+    await page.locator('.group-label', { hasText: '这学期的方向' }).waitFor()
+    await page.getByText('做完一个 ops 小项目').waitFor()
+    await page.goto(BASE + '#/review')
+    await page.locator('.main .row', { hasText: '我是谁' }).locator('.row-detail', { hasText: '2/10' }).waitFor()
+    await page.locator('.main .row', { hasText: '复制给 AI' }).click()
+    await page.getByText('已复制').waitFor()
+    const clip = await page.evaluate(() => navigator.clipboard.readText())
+    assert.ok(clip.includes('和我自己比，不和别人比') && clip.includes('还没验证') && clip.includes('### 这学期\n\n过四级'))
   })
 
   await step('手机上切换「待办 / 速记」：焦点留在输入框，弹层高度不变', async () => {
@@ -533,6 +575,7 @@ try {
       ['upcoming', '#/upcoming'],
       ['notes', '#/notes'],
       ['review', '#/review'],
+      ['me', '#/me'],
       ['week', `#/week/${WEEK}`],
     ]
     for (const [name, opts] of targets)
@@ -563,6 +606,18 @@ try {
         await p.waitForTimeout(450)
         await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-note.png`, import.meta.url).pathname })
         await p.keyboard.press('Escape')
+        await p.keyboard.press('Escape')
+        await p.waitForTimeout(300)
+        await p.goto(BASE + '#/me')
+        await p.waitForTimeout(600)
+        await p.evaluate(() => scrollTo(0, document.body.scrollHeight))
+        await p.waitForTimeout(400)
+        await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-me-2.png`, import.meta.url).pathname })
+        await p.evaluate(() => scrollTo(0, 0))
+        await p.waitForTimeout(300)
+        await p.locator('.me-row.tap', { hasText: '耗我的' }).click()
+        await p.waitForTimeout(450)
+        await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-me-edit.png`, import.meta.url).pathname })
         await p.keyboard.press('Escape')
         await p.waitForTimeout(300)
         assert.deepEqual(errs, [], `${name} ${scheme} 页面没有报错`)

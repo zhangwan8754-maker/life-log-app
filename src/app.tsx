@@ -9,6 +9,7 @@ import { BrandMark, Icon } from './components/Icon'
 import { FilePage } from './pages/FilePage'
 import { PlanHome, SideNav } from './pages/HomePage'
 import { JournalPage } from './pages/JournalPage'
+import { MePage } from './pages/MePage'
 import { NotesPage } from './pages/NotesPage'
 import { UpcomingPage } from './pages/UpcomingPage'
 import { ProjectPage } from './pages/ProjectPage'
@@ -30,7 +31,8 @@ const parse = (): Route => {
 /** 层级：四个主页 0，进入一层 1，再深一层 2。决定切换动画的方向 */
 const DEPTH: Record<string, number> = {
   '': 0, day: 0, home: 0, plan: 0, notes: 0, review: 0,
-  upcoming: 1, project: 1, journal: 1, thought: 1, week: 1, file: 1, settings: 1,
+  upcoming: 1, project: 1, journal: 1, thought: 1, week: 1, me: 1, settings: 1,
+  file: 2,
 }
 
 type Tab = 'today' | 'plan' | 'notes' | 'review'
@@ -38,7 +40,7 @@ const TAB_OF: Record<string, Tab> = {
   '': 'today', day: 'today', journal: 'today',
   home: 'plan', plan: 'plan', upcoming: 'plan', project: 'plan',
   notes: 'notes', thought: 'notes',
-  review: 'review', week: 'review', file: 'review', settings: 'review',
+  review: 'review', week: 'review', me: 'review', file: 'review', settings: 'review',
 }
 const TABS: [Tab, string, string, string][] = [
   ['today', '#/', '今天', 'today'],
@@ -103,6 +105,7 @@ function Page({ r }: { r: Route }) {
     case 'thought': return <ThoughtPage arg={[a, b].filter(Boolean).join('/')} />
     case 'review': return <ReviewPage />
     case 'week': return <WeekPage id={a} />
+    case 'me': return <MePage />
     case 'file': return <FilePage path={r.args.join('/')} />
     case 'settings': return <SettingsPage />
     default: return <TodayPage />
