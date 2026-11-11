@@ -55,3 +55,46 @@ describe('统计与复盘文件', () => {
     expect(p).not.toContain('updated: x')
   })
 })
+
+describe('投入、下一步、叫法', () => {
+  it('周统计汇总投入和标了「学到 / 问题」的速记，并写进数据', async () => {
+    const { dataSection, weekOf, weekStats } = await import('./review')
+    const r = weekOf('2026-11-05')
+    const ds: Record<string, string> = {
+      '2026-11-02': day('2026-11-02', 6, 5, ['投入：英语 1h，写代码 30min', '学到：先写清楚再动手']),
+      '2026-11-04': day('2026-11-04', 8, '', ['投入：写代码 2h', '问题：要不要换到早上跑步', '普通的一条']),
+    }
+    const s = weekStats(r, (d) => ds[d], todo, [], '2026-11-05')
+    expect(s.spent).toEqual([
+      { name: '写代码', hours: 2.5 },
+      { name: '英语', hours: 1 },
+    ])
+    expect(s.spentTotal).toBe(3.5)
+    expect(s.marked.map((m) => [m.date, m.kind])).toEqual([
+      ['2026-11-02', 'learned'],
+      ['2026-11-04', 'question'],
+    ])
+    expect(dataSection(s)).toContain('- 投入 3.5h：写代码 2.5h、英语 1h')
+  })
+
+  it('读出上一期的下一步', async () => {
+    const { nextSteps, periodLabel, prevWeek, weekOf } = await import('./review')
+    expect(nextSteps('## 下一步\n\n- 早睡\n- [ ] 每天读书 1h\n2. 周日做计划\n<!-- 注释 -->\n')).toEqual(['早睡', '每天读书 1h', '周日做计划'])
+    expect(nextSteps('## 事实\n\n没有下一步\n')).toEqual([])
+    expect(prevWeek(weekOf('2026-11-05')).id).toBe('2026-W44')
+    expect([periodLabel('2026-W05'), periodLabel('2026-11'), periodLabel('2026'), periodLabel('随便')]).toEqual(['2026 年第 5 周', '2026 年 11 月', '2026 年', '随便'])
+  })
+
+  it('AI 提示词带上上周的下一步和模式账本', async () => {
+    const { aiPrompt, weekOf, weekStats } = await import('./review')
+    const r = weekOf('2026-11-05')
+    const s = weekStats(r, (d) => days[d], todo, [], '2026-11-05')
+    const p = aiPrompt(r, '', (d) => days[d], todo, s, {
+      prevNext: ['早睡'],
+      patterns: [{ heading: 'P1 x', id: 'P1', title: '睡够的日子精力更好', status: '观察中', note: '', body: '' }],
+    })
+    expect(p).toContain('## 上周说的下一步\n- 早睡')
+    expect(p).toContain('- P1 睡够的日子精力更好（观察中）')
+    expect(aiPrompt(r, '', (d) => days[d], todo, s)).not.toContain('模式账本（')
+  })
+})

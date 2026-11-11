@@ -93,7 +93,7 @@ export function ThoughtPage({ arg }: { arg: string }) {
 
   const shownTitle = editing ? title || '新的思想' : titleOf(path, md)
   return (
-    <Page title={shownTitle} back={{ href: '#/notes', label: '笔记' }} actions={toggle} subtitle={dirty ? '编辑中' : undefined} class="thought-page">
+    <Page title={shownTitle} back={{ href: '#/memory/thoughts', label: '记忆' }} actions={toggle} subtitle={dirty ? '编辑中' : undefined} class="thought-page">
       {editing ? (
         <div class="editor">
           <input ref={titleRef} class="title-input" value={title} placeholder="标题" onInput={(e) => change({ title: (e.target as HTMLInputElement).value })} />

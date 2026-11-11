@@ -8,6 +8,7 @@
 import { type Config, GitHub, HttpError } from './github'
 import * as idb from './idb'
 import { appendNote, deleteNote, editNote, newDay, restoreNote, setMeta, setSection } from './md'
+import { removeProposal, setPatternStatus, type PatternStatus } from './memory'
 import { setMeField } from './me'
 import * as T from './todo'
 
@@ -35,6 +36,8 @@ export type OpArgs =
   | { kind: 'todo.move'; key: string; section: string }
   | { kind: 'todo.delete'; key: string }
   | { kind: 'me.set'; section: string; sub: string; text: string; date: string }
+  | { kind: 'pattern.status'; heading: string; status: PatternStatus; date: string }
+  | { kind: 'proposal.remove'; key: string; date: string }
   | { kind: 'write'; content: string; label: string }
 
 export type Op = OpArgs & { id: string; path: string }
@@ -65,6 +68,8 @@ export function applyOp(c: string | null, op: OpArgs): string {
     case 'todo.move': return T.moveTask(c, op.key, legacyGroup(op.section))
     case 'todo.delete': return T.deleteTask(c, op.key)
     case 'me.set': return setMeField(c, op.section, op.sub, op.text, op.date)
+    case 'pattern.status': return setPatternStatus(c ?? '', op.heading, op.status, op.date)
+    case 'proposal.remove': return removeProposal(c ?? '', op.key, op.date)
     case 'write': return op.content
   }
 }
@@ -87,6 +92,8 @@ function label(op: Op): string {
     case 'journal': return `日记 ${op.date}`
     case 'write': return op.label
     case 'me.set': return '我是谁'
+    case 'pattern.status': return `记忆：模式改为「${op.status}」`
+    case 'proposal.remove': return '记忆：处理一条提议'
     case 'todo.migrate': return '待办：升级格式'
     default: return op.kind.startsWith('project') ? '项目' : '待办'
   }
@@ -94,7 +101,7 @@ function label(op: Op): string {
 
 export type Status = 'idle' | 'syncing' | 'offline' | 'error'
 
-const TRACKED = (p: string) => p === 'me.md' || p === 'todo.md' || /^(days|thoughts|reviews)\/.+\.md$/.test(p)
+const TRACKED = (p: string) => p === 'me.md' || p === 'todo.md' || /^(days|thoughts|reviews|memory)\/.+\.md$/.test(p)
 const CFG_KEY = 'll.config'
 const STATE_KEY = 'll.state'
 

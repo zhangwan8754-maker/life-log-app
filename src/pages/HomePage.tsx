@@ -53,7 +53,7 @@ export function SideNav({ tab, current }: { tab: string; current?: string }) {
       <div class="side-group">
         <ListRow icon="today" label="今天" detail={open.filter((t) => t.date && t.date <= today).length || ''} href="#/" on={tab === 'today'} />
         <ListRow icon="plan" label="计划" href="#/plan" on={tab === 'plan' && !current} />
-        <ListRow icon="notes" label="笔记" href="#/notes" on={tab === 'notes'} />
+        <ListRow icon="memory" label="记忆" href="#/memory" on={tab === 'memory'} />
         <ListRow icon="review" label="复盘" href="#/review" on={tab === 'review'} />
       </div>
       <div class="side-group">

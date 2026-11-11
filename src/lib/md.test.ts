@@ -86,3 +86,47 @@ describe('日期', () => {
     expect(isoWeek('2024-12-30')).toEqual([2025, 1])
   })
 })
+
+describe('速记的三种开头', () => {
+  it('认出种类，去掉开头', async () => {
+    const { noteKind, withKind } = await import('./md')
+    expect(noteKind('学到：先列提纲再动笔')).toEqual({ kind: 'learned', body: '先列提纲再动笔' })
+    expect(noteKind('问题: 要不要换到早上跑步')).toEqual({ kind: 'question', body: '要不要换到早上跑步' })
+    expect(noteKind('投入 英语 1h')).toEqual({ kind: 'spent', body: '英语 1h' })
+    // 只是以这两个字开头的普通句子不算
+    expect(noteKind('投入产出比太低').kind).toBe('plain')
+    expect(noteKind('问题不大').kind).toBe('plain')
+    expect(withKind('learned', '慢即是快')).toBe('学到：慢即是快')
+    expect(withKind('plain', '慢即是快')).toBe('慢即是快')
+  })
+
+  it('投入：按名称和时长解析，认不出的片段单独列出', async () => {
+    const { parseSpent, daySpent, fmtHours, fmtMinutes, sumSpent } = await import('./md')
+    expect(parseSpent('投入：英语 1h，读书 1.5小时、写代码40min; 跑步 30 分钟')).toEqual({
+      items: [
+        { name: '英语', hours: 1 },
+        { name: '读书', hours: 1.5 },
+        { name: '写代码', hours: 40 / 60 },
+        { name: '跑步', hours: 0.5 },
+      ],
+      bad: [],
+    })
+    expect(parseSpent('投入：英语 1h，乱写')).toEqual({ items: [{ name: '英语', hours: 1 }], bad: ['乱写'] })
+    expect(parseSpent('昨天去了海边')).toBeNull()
+    const md = '---\ndate: 2026-11-05\n---\n## 日记\n\n## 速记\n\n- 09:00 投入：英语 1h\n- 12:00 随便想想\n- 21:00 投入：写代码 2h，英语 30min\n'
+    expect(daySpent(md)).toEqual([
+      { name: '写代码', hours: 2 },
+      { name: '英语', hours: 1.5 },
+    ])
+    expect(sumSpent([[{ name: 'a', hours: 1 }], [{ name: 'a', hours: 2 }]])).toEqual([{ name: 'a', hours: 3 }])
+    expect([fmtHours(1.5), fmtHours(40 / 60), fmtHours(2)]).toEqual(['1.5h', '0.7h', '2h'])
+    expect([fmtMinutes(60), fmtMinutes(90), fmtMinutes(40), fmtMinutes(30)]).toEqual(['1h', '1.5h', '40min', '30min'])
+  })
+
+  it('没有时间的速记不留多余空格', async () => {
+    const { appendNote, newDay, parseNotes } = await import('./md')
+    const md = appendNote(newDay('2026-11-05'), '', '投入：英语 1h')
+    expect(md).toContain('## 速记\n\n- 投入：英语 1h\n')
+    expect(parseNotes(md)).toEqual([{ time: '', text: '投入：英语 1h' }])
+  })
+})

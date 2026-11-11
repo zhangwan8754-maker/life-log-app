@@ -1,18 +1,41 @@
 import { useState } from 'preact/hooks'
+import * as A from '../lib/actions'
 import { recent, visible } from '../lib/actions'
-import { addDays, cnMonthDay, dayPath, hm, isYmd, parseYmd, weekday, ymd } from '../lib/dates'
+import { addDays, cnMonthDay, dayPath, isYmd, parseYmd, weekday, ymd } from '../lib/dates'
 import { dayMd, useFile, useToday, useTodo, useTree } from '../lib/hooks'
-import { getMeta, getSection, parseNotes, score } from '../lib/md'
+import { daySpent, fmtHours, getMeta, getSection, noteKind, parseNotes, score } from '../lib/md'
 import { store } from '../lib/store'
 import { allTasks } from '../lib/todo'
 import { cx, go, useBox } from '../lib/ui'
 import { type Metric, METRIC_NAME } from '../components/Charts'
 import { Icon } from '../components/Icon'
-import { Empty, Page } from '../components/Page'
+import { Page } from '../components/Page'
 import { Sheet } from '../components/Sheet'
+import { SpentBars, spentTotal } from '../components/Spent'
 import { TaskRow } from '../components/TaskRow'
 import { NoteRow } from '../components/NoteSheet'
 
+/** 情绪 / 精力：一个数字加十格刻度，点开打分 */
+function Meter({ metric, value, onClick }: { metric: Metric; value: number | null; onClick: () => void }) {
+  return (
+    <button type="button" class={cx('meter', metric, value === null && 'unset')} aria-label={`${METRIC_NAME[metric]} ${value ?? '未打分'}`} onClick={onClick}>
+      <span class="meter-top">
+        <span class="meter-name">{METRIC_NAME[metric]}</span>
+        <b>{value ?? '—'}</b>
+      </span>
+      <span class="meter-bar" aria-hidden="true">
+        {Array.from({ length: 10 }, (_, i) => (
+          <i class={cx(value !== null && i < value && 'on')} />
+        ))}
+      </span>
+    </button>
+  )
+}
+
+/**
+ * 一天的全部：状态、要做的事、日记、投入、速记。
+ * 这是「捕获」的入口 —— 记录和待办同样重要，所以都直接摆在页面上，不藏在弹层里。
+ */
 export function TodayPage({ date }: { date?: string }) {
   const today = useToday()
   const d = date && isYmd(date) ? date : today
@@ -23,9 +46,9 @@ export function TodayPage({ date }: { date?: string }) {
   const rec = useBox(recent)
   useTree('days/')
   const [score_, setScore] = useState<Metric | null>(null)
-  const [notesOpen, setNotesOpen] = useState(false)
   const [cal, setCal] = useState(false)
   const [showDone, setShowDone] = useState(false)
+  const [text, setText] = useState('')
 
   const tasks = allTasks(groups)
   const due = tasks
@@ -33,10 +56,12 @@ export function TodayPage({ date }: { date?: string }) {
     .filter((t) => !t.done || t.doneOn === d)
     .sort((a, b) => a.date.localeCompare(b.date))
   const doneHere = tasks.filter((t) => t.done && t.doneOn === d && !rec[`${t.group}|${t.key}`])
-  const notes = parseNotes(md)
+  const notes = parseNotes(md).filter((n) => noteKind(n.text).kind !== 'spent')
+  const spent = daySpent(md)
   const journal = (getSection(md, '日记') ?? '').trim()
   const mood = score(getMeta(md, 'mood'))
   const energy = score(getMeta(md, 'energy'))
+  const past = d <= today
 
   const prev = addDays(d, -1)
   const next = addDays(d, 1)
@@ -61,6 +86,12 @@ export function TodayPage({ date }: { date?: string }) {
 
   return (
     <Page title={isToday ? '今天' : cnMonthDay(d)} icon={isToday ? 'today' : 'calendar'} subtitle={subtitle} class="today">
+      <div class="group meters">
+        <Meter metric="mood" value={mood} onClick={() => setScore('mood')} />
+        <Meter metric="energy" value={energy} onClick={() => setScore('energy')} />
+      </div>
+
+      <p class="group-label">{isToday ? '要做的事' : '这一天的事'}</p>
       <div class="group">
         {due.length > 0 ? (
           <div class="tasks">
@@ -69,9 +100,7 @@ export function TodayPage({ date }: { date?: string }) {
             ))}
           </div>
         ) : (
-          !loading && (
-            <Empty icon="today">{isToday ? (doneHere.length ? '今天的事都做完了。' : '今天没有安排，留一点空白也很好。') : '这一天没有安排。'}</Empty>
-          )
+          !loading && <p class="group-empty">{isToday ? (doneHere.length ? '今天的事都做完了。' : '今天没有安排，留一点空白也很好。') : '这一天没有安排。'}</p>
         )}
       </div>
       {doneHere.length > 0 && (
@@ -93,28 +122,74 @@ export function TodayPage({ date }: { date?: string }) {
         </>
       )}
 
-      <div class="group status-group">
-        <div class="status">
-          <button type="button" onClick={() => setScore('mood')}>
-            情绪 <b class={cx(mood === null && 'unset')}>{mood ?? '—'}</b>
-          </button>
-          <i>·</i>
-          <button type="button" onClick={() => setScore('energy')}>
-            精力 <b class={cx(energy === null && 'unset')}>{energy ?? '—'}</b>
-          </button>
-          <i>·</i>
-          <button type="button" class={cx(journal && 'has')} onClick={() => go(`#/journal/${d}`)}>
-            日记
-          </button>
-          <i>·</i>
-          <button type="button" class={cx(notes.length > 0 && 'has')} onClick={() => setNotesOpen(true)}>
-            {notes.length ? `${notes.length} 条速记` : '速记'}
-          </button>
-        </div>
+      <p class="group-label">日记</p>
+      <a class={cx('group journal-card', journal && 'has')} href={`#/journal/${d}`} aria-label="日记">
+        {journal ? (
+          <>
+            <span class="journal-excerpt">{journal.replace(/\n\s*\n/g, '\n')}</span>
+            <span class="journal-meta">{journal.replace(/\s/g, '').length} 字 · 接着写</span>
+          </>
+        ) : (
+          <span class="journal-hint">
+            <Icon name="edit" size={18} />
+            {isToday ? '今天发生了什么？感受如何？' : '这一天没有写日记，点这里补上。'}
+          </span>
+        )}
+      </a>
+
+      {(past || spent.length > 0) && (
+        <>
+          <p class="group-label label-bar">
+            <span>投入</span>
+            {spent.length > 0 && <span class="label-detail">合计 {fmtHours(spentTotal(spent))}</span>}
+          </p>
+          <div class="group spent-group">
+            {spent.length > 0 && (
+              <button type="button" class="spent-tap" aria-label="查看和修改投入" onClick={() => A.spentSheet.set({ date: d })}>
+                <SpentBars items={spent} />
+              </button>
+            )}
+            {past && (
+              <button type="button" class="row add-spent" onClick={() => A.spentSheet.set({ date: d })}>
+                <span class="row-icon">
+                  <Icon name="plus" size={22} />
+                </span>
+                <span class="row-label muted">记一笔</span>
+                {!spent.length && <span class="row-detail">时间花在哪了</span>}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      <p class="group-label">速记</p>
+      <div class="group day-notes">
+        {notes.length > 0 && (
+          <ul class="notes in-group">
+            {notes.map((n) => (
+              <NoteRow date={d} note={n} />
+            ))}
+          </ul>
+        )}
+        {isToday ? (
+          <form
+            class="note-add inline"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const v = text.trim()
+              if (!v) return
+              A.addNote(d, v)
+              setText('')
+            }}
+          >
+            <input value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} placeholder="记一条……" enterKeyHint="send" aria-label="速记" />
+          </form>
+        ) : (
+          !notes.length && <p class="group-empty">这一天没有速记。</p>
+        )}
       </div>
 
       <ScoreSheet metric={score_} date={d} md={md} onClose={() => setScore(null)} />
-      <NotesSheet open={notesOpen} date={d} md={md} editable={isToday} onClose={() => setNotesOpen(false)} />
       <CalendarSheet open={cal} date={d} onClose={() => setCal(false)} />
     </Page>
   )
@@ -147,35 +222,6 @@ function ScoreSheet({ metric, date, md, onClose }: { metric: Metric | null; date
             </button>
           )}
         </div>
-      )}
-    </Sheet>
-  )
-}
-
-function NotesSheet({ open, date, md, editable, onClose }: { open: boolean; date: string; md: string; editable: boolean; onClose: () => void }) {
-  const [text, setText] = useState('')
-  const notes = parseNotes(md)
-  return (
-    <Sheet open={open} onClose={onClose} title="速记" label="速记">
-      {notes.length === 0 && <p class="sheet-sub">{editable ? '一闪而过的念头，随手记下。' : '这一天没有速记。'}</p>}
-      <ul class="notes">
-        {notes.map((n) => (
-          <NoteRow date={date} note={n} />
-        ))}
-      </ul>
-      {editable && (
-        <form
-          class="note-add"
-          onSubmit={(e) => {
-            e.preventDefault()
-            const v = text.trim()
-            if (!v) return
-            store.enqueue(dayPath(date), { kind: 'note', date, time: hm(), text: v })
-            setText('')
-          }}
-        >
-          <input class="field-input" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} placeholder="记一条……" enterKeyHint="send" aria-label="速记" />
-        </form>
       )}
     </Sheet>
   )

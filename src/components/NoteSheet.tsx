@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'preact/hooks'
 import * as A from '../lib/actions'
 import { cnMonthDay, weekday } from '../lib/dates'
-import type { Note } from '../lib/md'
+import { KIND_LABEL, noteKind, type Note } from '../lib/md'
 import { go, useBox } from '../lib/ui'
 import { Icon } from './Icon'
 import { Sheet } from './Sheet'
 
-/** 一条速记：点开可以编辑、删除、提炼 */
+/** 一条速记：点开可以编辑、删除、提炼。「投入 / 学到 / 问题」开头的显示成小标签 */
 export function NoteRow({ date, note }: { date: string; note: Note }) {
+  const k = noteKind(note.text)
   return (
     <li>
       <button type="button" class="note-row" onClick={() => A.noteSheet.set({ date, time: note.time, text: note.text })}>
         <time>{note.time}</time>
-        <span>{note.text}</span>
+        <span>
+          {k.kind !== 'plain' && <em class={`kind ${k.kind}`}>{KIND_LABEL[k.kind]}</em>}
+          {k.body}
+        </span>
         <Icon name="more" size={18} class="note-more" />
       </button>
     </li>

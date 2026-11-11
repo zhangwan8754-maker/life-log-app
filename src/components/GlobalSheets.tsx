@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import * as A from '../lib/actions'
-import { dayPath, hm } from '../lib/dates'
 import { useToday, useTodo } from '../lib/hooks'
-import { store } from '../lib/store'
+import { parseSpent, withKind, type NoteKind } from '../lib/md'
 import { INBOX, withDate, type Group, type Task } from '../lib/todo'
 import { cx, go, toast, useBox } from '../lib/ui'
 import { Pie, Tabs, WhenPicker, whenLabel } from './Controls'
 import { Icon } from './Icon'
 import { NoteSheet } from './NoteSheet'
 import { Sheet } from './Sheet'
+import { SpentSheet } from './Spent'
 
 const stripDate = (key: string) => withDate(key, '')
 
@@ -70,6 +70,14 @@ function Attrs({ date, group, today, onDate, onGroup }: { date: string; group: s
   )
 }
 
+/** 速记的种类。「想法」不加开头；其余三种会在前面加上「学到：」这样的开头，复盘时能单独找出来 */
+const KINDS: { kind: NoteKind; label: string; placeholder: string }[] = [
+  { kind: 'plain', label: '想法', placeholder: '此刻在想什么' },
+  { kind: 'learned', label: '学到', placeholder: '这次学到了什么' },
+  { kind: 'question', label: '问题', placeholder: '想弄明白什么' },
+  { kind: 'spent', label: '投入', placeholder: '英语 1h，跑步 40min' },
+]
+
 function QuickEntry() {
   const c = useBox(A.capture)
   const today = useToday()
@@ -78,7 +86,9 @@ function QuickEntry() {
   const [date, setDate] = useState(today)
   const [group, setGroup] = useState(INBOX)
   const [added, setAdded] = useState<string[]>([])
+  const [kind, setKind] = useState<NoteKind>('plain')
   const input = useRef<HTMLInputElement>(null)
+  const k = KINDS.find((x) => x.kind === kind)!
 
   useEffect(() => {
     if (!c) return
@@ -87,6 +97,7 @@ function QuickEntry() {
     setGroup(c.group ?? INBOX)
     setText('')
     setAdded([])
+    setKind('plain')
     setTimeout(() => input.current?.focus(), 80)
   }, [c])
 
@@ -101,7 +112,10 @@ function QuickEntry() {
       setText('')
       input.current?.focus()
     } else {
-      store.enqueue(dayPath(today), { kind: 'note', date: today, time: hm(), text: v })
+      const note = withKind(kind, v)
+      const sp = parseSpent(note)
+      if (sp && (sp.bad.length || !sp.items.length)) return toast('写成「英语 1h，跑步 40min」才能统计')
+      A.addNote(today, note)
       toast('已记下')
       close()
     }
@@ -140,7 +154,7 @@ function QuickEntry() {
           class="quick-input"
           value={text}
           onInput={(e) => setText((e.target as HTMLInputElement).value)}
-          placeholder={mode === 'task' ? '新的待办' : '此刻在想什么'}
+          placeholder={mode === 'task' ? '新的待办' : k.placeholder}
           enterKeyHint="done"
           autocomplete="off"
           aria-label={mode === 'task' ? '新的待办' : '速记'}
@@ -148,7 +162,20 @@ function QuickEntry() {
         {mode === 'task' ? (
           <Attrs date={date} group={group} today={today} onDate={setDate} onGroup={setGroup} />
         ) : (
-          <p class="quick-hint">记进今天的速记，之后可以提炼成思想</p>
+          <div class="attrs kinds" role="group" aria-label="速记的种类">
+            {KINDS.map((x) => (
+              <button
+                type="button"
+                class={cx('attr', kind === x.kind && 'on')}
+                aria-pressed={kind === x.kind}
+                // 不抢走输入框的焦点：键盘不会收起再弹出
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setKind(x.kind)}
+              >
+                {x.label}
+              </button>
+            ))}
+          </div>
         )}
         {added.length > 0 && (
           <ul class="added">
@@ -262,6 +289,7 @@ export function GlobalSheets() {
       <QuickEntry />
       <TaskSheet />
       <DateSheet />
+      <SpentSheet />
       <NoteSheet />
     </>
   )

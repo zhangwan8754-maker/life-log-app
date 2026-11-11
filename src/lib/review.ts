@@ -1,6 +1,7 @@
 /** 每周复盘：统计、生成 reviews/YYYY-Www.md、生成给 AI 的提示词 */
 import { addDays, isoWeek, parseYmd } from './dates'
-import { getMeta, getSection, parseNotes, score, setSection, stripFrontmatter } from './md'
+import { fmtHours, getMeta, getSection, noteKind, parseNotes, parseSpent, score, setSection, stripFrontmatter, sumSpent, type NoteKind, type Spent } from './md'
+import type { Pattern } from './memory'
 import { allTasks, parseTodo, type Task } from './todo'
 
 export interface WeekRange {
@@ -40,6 +41,11 @@ export interface WeekStats {
   overdue: Task[]
   open: number
   thoughts: string[]
+  /** 「投入：」速记按名称汇总，时长多的在前 */
+  spent: Spent[]
+  spentTotal: number
+  /** 标了「学到 / 问题」的速记 */
+  marked: { date: string; time: string; text: string; kind: NoteKind }[]
 }
 
 const avg = (xs: (number | null)[]) => {
@@ -58,6 +64,8 @@ export function weekStats(
   const mood = mds.map((m) => score(getMeta(m, 'mood')))
   const energy = mds.map((m) => score(getMeta(m, 'energy')))
   const tasks = allTasks(parseTodo(todoMd))
+  const allNotes = mds.flatMap((m, i) => parseNotes(m).map((n) => ({ date: r.days[i], ...n })))
+  const spent = sumSpent(allNotes.map((n) => parseSpent(n.text)?.items ?? []))
   return {
     daysLogged: mds.filter((m) => m.trim()).length,
     mood,
@@ -69,8 +77,13 @@ export function weekStats(
     overdue: tasks.filter((t) => !t.done && t.date && t.date < today),
     open: tasks.filter((t) => !t.done).length,
     thoughts: thoughts.filter((t) => t.created >= r.from && t.created <= r.to).map((t) => t.title),
+    spent,
+    spentTotal: spent.reduce((a, x) => a + x.hours, 0),
+    marked: allNotes.map((n) => ({ ...n, kind: noteKind(n.text).kind })).filter((n) => n.kind === 'learned' || n.kind === 'question'),
   }
 }
+
+export const spentLine = (xs: Spent[]) => xs.map((x) => `${x.name} ${fmtHours(x.hours)}`).join('、')
 
 export function dataSection(s: WeekStats): string {
   const lines = [
@@ -78,6 +91,7 @@ export function dataSection(s: WeekStats): string {
     `- 情绪均值 ${s.moodAvg}，精力均值 ${s.energyAvg}`,
     `- 完成待办 ${s.completed.length} 件，逾期 ${s.overdue.length} 件，未完成共 ${s.open} 件`,
   ]
+  if (s.spent.length) lines.push(`- 投入 ${fmtHours(s.spentTotal)}：${spentLine(s.spent)}`)
   if (s.thoughts.length) lines.push(`- 新增思想：${s.thoughts.join('、')}`)
   if (s.completed.length) lines.push('', '完成：', ...s.completed.map((t) => `- ${t.text}（${t.group}）`))
   return lines.join('\n')
@@ -92,6 +106,27 @@ export interface ReviewParts {
 export function parseReview(md: string | null | undefined): ReviewParts {
   const m = md ?? ''
   return { facts: getSection(m, '事实') ?? '', patterns: getSection(m, '模式') ?? '', next: getSection(m, '下一步') ?? '' }
+}
+
+/** 复盘里「下一步」的每一条（去掉列表符号和复选框） */
+export function nextSteps(md: string | null | undefined): string[] {
+  return (getSection(md ?? '', '下一步') ?? '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .split('\n')
+    .map((l) => l.replace(/^\s*(?:[-*]|\d+[.、)])\s+(?:\[[ xX]\]\s+)?/, '').trim())
+    .filter(Boolean)
+}
+
+/** 上一周 */
+export const prevWeek = (r: WeekRange) => weekOf(addDays(r.from, -1))
+
+/** 「历史复盘」里的叫法：2026-W45 → 2026 年第 45 周，2026-11 → 2026 年 11 月 */
+export function periodLabel(id: string): string {
+  const w = id.match(/^(\d{4})-W(\d+)$/)
+  if (w) return `${w[1]} 年第 ${Number(w[2])} 周`
+  const m = id.match(/^(\d{4})-(\d{2})$/)
+  if (m) return `${m[1]} 年 ${Number(m[2])} 月`
+  return /^\d{4}$/.test(id) ? `${id} 年` : id
 }
 
 export function reviewMarkdown(r: WeekRange, s: WeekStats, p: ReviewParts, existing?: string | null): string {
@@ -112,7 +147,12 @@ export function aiPrompt(
   dayMd: (date: string) => string | null | undefined,
   todoMd: string,
   s: WeekStats,
+  extra: { prevNext?: string[]; patterns?: Pattern[] } = {},
 ): string {
+  const prevNext = extra.prevNext?.length ? `\n## 上周说的下一步\n${extra.prevNext.map((x) => `- ${x}`).join('\n')}\n` : ''
+  const patterns = extra.patterns?.length
+    ? `\n## 模式账本（之前记下的假设，不是结论）\n${extra.patterns.map((p) => `- ${p.id ? `${p.id} ` : ''}${p.title}${p.status ? `（${p.status}）` : ''}`).join('\n')}\n`
+    : ''
   const days = r.days
     .map((d) => {
       const md = dayMd(d)
@@ -143,14 +183,16 @@ export function aiPrompt(
 - 先事实后解释，引用具体日期和原话；用数据说话。
 - 对照「我是谁」里的「在乎」和「方向」。评价我时用我自己的尺子（「好的一天」），和我自己比，不和别人比。
 - 「做法」里「借来的」是我读到、听到但还没验证的话，不要当成我的结论；可以指出这周哪件事验证或推翻了它。
-- 找出重复出现的模式；不说教，最后给出最多 3 条可执行的下一步。
+- 先逐条核对「上周说的下一步」做了没有。
+- 找出重复出现的模式，对照「模式账本」：哪条多了证据、哪条出现了反例；证据和反例一起给。
+- 不说教，最后给出最多 3 条可执行的下一步。
 
 ## 我是谁
 ${stripFrontmatter(me).trim() || '（未填写）'}
 
 ## 本周数据
 ${dataSection(s)}
-
+${prevNext}${patterns}
 ## 每天的记录
 ${days || '（本周没有记录）'}
 

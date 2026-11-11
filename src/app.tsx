@@ -10,7 +10,8 @@ import { FilePage } from './pages/FilePage'
 import { PlanHome, SideNav } from './pages/HomePage'
 import { JournalPage } from './pages/JournalPage'
 import { MePage } from './pages/MePage'
-import { NotesPage } from './pages/NotesPage'
+import { MemoryPage } from './pages/MemoryPage'
+import { ProposalsPage } from './pages/ProposalsPage'
 import { UpcomingPage } from './pages/UpcomingPage'
 import { ProjectPage } from './pages/ProjectPage'
 import { ReviewPage } from './pages/ReviewPage'
@@ -30,22 +31,22 @@ const parse = (): Route => {
 
 /** 层级：四个主页 0，进入一层 1，再深一层 2。决定切换动画的方向 */
 const DEPTH: Record<string, number> = {
-  '': 0, day: 0, home: 0, plan: 0, notes: 0, review: 0,
-  upcoming: 1, project: 1, journal: 1, thought: 1, week: 1, me: 1, settings: 1,
+  '': 0, day: 0, home: 0, plan: 0, memory: 0, notes: 0, review: 0,
+  upcoming: 1, project: 1, journal: 1, thought: 1, week: 1, me: 1, settings: 1, proposals: 1,
   file: 2,
 }
 
-type Tab = 'today' | 'plan' | 'notes' | 'review'
+type Tab = 'today' | 'plan' | 'memory' | 'review'
 const TAB_OF: Record<string, Tab> = {
   '': 'today', day: 'today', journal: 'today',
   home: 'plan', plan: 'plan', upcoming: 'plan', project: 'plan',
-  notes: 'notes', thought: 'notes',
-  review: 'review', week: 'review', me: 'review', file: 'review', settings: 'review',
+  memory: 'memory', notes: 'memory', thought: 'memory',
+  review: 'review', week: 'review', me: 'review', file: 'review', settings: 'review', proposals: 'review',
 }
 const TABS: [Tab, string, string, string][] = [
   ['today', '#/', '今天', 'today'],
   ['plan', '#/plan', '计划', 'plan'],
-  ['notes', '#/notes', '笔记', 'notes'],
+  ['memory', '#/memory', '记忆', 'memory'],
   ['review', '#/review', '复盘', 'review'],
 ]
 
@@ -57,6 +58,7 @@ const FAB: Record<string, () => Parameters<typeof capture.set>[0]> = {
   upcoming: () => ({ mode: 'task', date: '' }),
   plan: () => ({ mode: 'task', date: '' }),
   project: () => ({ mode: 'task', date: '', group: parse().args[0] || INBOX }),
+  memory: () => ({ mode: 'note' }),
   notes: () => ({ mode: 'note' }),
   review: () => ({ mode: 'task' }),
 }
@@ -101,7 +103,10 @@ function Page({ r }: { r: Route }) {
     case 'journal': return <JournalPage date={a} />
     case 'upcoming': return <UpcomingPage />
     case 'project': return <ProjectPage name={a} />
-    case 'notes': return <NotesPage seg={a === 'stream' ? 'stream' : 'thoughts'} />
+    case 'memory': return <MemoryPage seg={a === 'thoughts' || a === 'patterns' ? a : 'timeline'} />
+    // 旧地址：笔记 → 记忆
+    case 'notes': return <MemoryPage seg={a === 'stream' ? 'timeline' : 'thoughts'} />
+    case 'proposals': return <ProposalsPage />
     case 'thought': return <ThoughtPage arg={[a, b].filter(Boolean).join('/')} />
     case 'review': return <ReviewPage />
     case 'week': return <WeekPage id={a} />
@@ -171,7 +176,8 @@ export function App() {
   }, [])
 
   const fab = connected ? FAB[r.name] : undefined
-  const tab = TAB_OF[r.name] ?? 'today'
+  // 记忆层的文件（大事记等）从「记忆」进来，其余文件属于「复盘」
+  const tab = r.name === 'file' && r.args[0] === 'memory' ? 'memory' : (TAB_OF[r.name] ?? 'today')
   return (
     <div class={cx('shell', !connected && 'setup')}>
       {connected && (

@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { setDate } from '../lib/actions'
 import { addDays, cnMonthDay, shortWeekday } from '../lib/dates'
 import { dayMd, useFile, useToday, useTodo, useTree } from '../lib/hooks'
-import { getSection } from '../lib/md'
+import { fmtHours, getSection } from '../lib/md'
 import { termGoals } from '../lib/me'
-import { parseReview, reviewMarkdown, reviewPath, weekFromId, weekStats, type ReviewParts } from '../lib/review'
+import { nextSteps, parseReview, prevWeek, reviewMarkdown, reviewPath, weekFromId, weekStats, type ReviewParts } from '../lib/review'
 import { store } from '../lib/store'
 import { allTasks, INBOX, SOMEDAY } from '../lib/todo'
 import { cx, debounce, go, markdown, toast } from '../lib/ui'
@@ -12,6 +12,8 @@ import { Trend } from '../components/Charts'
 import { Chip } from '../components/Controls'
 import { Icon } from '../components/Icon'
 import { Empty, Page } from '../components/Page'
+import { NoteRow } from '../components/NoteSheet'
+import { SpentBars } from '../components/Spent'
 import { TaskRow } from '../components/TaskRow'
 import { Stats, thoughtIndex } from './ReviewPage'
 
@@ -25,6 +27,8 @@ export function WeekPage({ id }: { id: string }) {
   const me = useFile('me.md') ?? ''
   const path = r ? reviewPath(r) : null
   const existing = useFile(path)
+  // 上一期说的下一步：这一期复盘的第一件事是回来看它们做了没有
+  const promised = nextSteps(useFile(r ? reviewPath(prevWeek(r)) : null))
   const [step, setStep] = useState(0)
   const [parts, setParts] = useState<ReviewParts>({ facts: '', patterns: '', next: '' })
   const loaded = useRef(false)
@@ -80,9 +84,9 @@ export function WeekPage({ id }: { id: string }) {
         </span>
       </div>
 
-      {step === 0 && <Recap r={r} stats={stats} />}
+      {step === 0 && <Recap r={r} stats={stats} promised={promised} />}
       {step === 1 && <Tidy today={today} />}
-      {step === 2 && <Reflect parts={parts} update={update} stats={stats} />}
+      {step === 2 && <Reflect parts={parts} update={update} stats={stats} promised={promised} />}
       {step === 3 && <PlanNext today={today} me={me} />}
 
       <div class="step-actions">
@@ -108,14 +112,39 @@ export function WeekPage({ id }: { id: string }) {
   )
 }
 
-function Recap({ r, stats }: { r: NonNullable<ReturnType<typeof weekFromId>>; stats: ReturnType<typeof weekStats> }) {
+function Recap({ r, stats, promised }: { r: NonNullable<ReturnType<typeof weekFromId>>; stats: ReturnType<typeof weekStats>; promised: string[] }) {
   const excerpts = r.days
     .map((d) => ({ d, j: (getSection(dayMd(d) ?? '', '日记') ?? '').split('\n').find((l) => l.trim()) }))
     .filter((x) => x.j)
   return (
     <>
       <p class="step-intro">先只看事实：这一周发生了什么。</p>
+      {promised.length > 0 && (
+        <>
+          <p class="group-label">上周说要做的</p>
+          <div class="group promised">
+            <ol>
+              {promised.map((x) => (
+                <li>{x}</li>
+              ))}
+            </ol>
+            <p class="group-foot">做了吗？到「反思」那一步，先把这几条写进事实。</p>
+          </div>
+          <p class="group-label">这一周</p>
+        </>
+      )}
       <Stats s={stats} />
+      {stats.spent.length > 0 && (
+        <>
+          <p class="group-label label-bar">
+            <span>投入</span>
+            <span class="label-detail">合计 {fmtHours(stats.spentTotal)}</span>
+          </p>
+          <div class="group spent-group">
+            <SpentBars items={stats.spent} />
+          </div>
+        </>
+      )}
       {(stats.mood.some((v) => v !== null) || stats.energy.some((v) => v !== null)) && (
         <>
           <p class="group-label">情绪与精力</p>
@@ -150,6 +179,19 @@ function Recap({ r, stats }: { r: NonNullable<ReturnType<typeof weekFromId>>; st
                 <span class="row-label">{x.j}</span>
               </a>
             ))}
+          </div>
+        </>
+      )}
+      {stats.marked.length > 0 && (
+        <>
+          <p class="group-label">标了「学到 / 问题」的速记</p>
+          <div class="group">
+            <ul class="notes in-group">
+              {stats.marked.map((n) => (
+                <NoteRow date={n.date} note={n} />
+              ))}
+            </ul>
+            <p class="group-foot">点开一条，可以提炼成思想。</p>
           </div>
         </>
       )}
@@ -201,7 +243,9 @@ function Tidy({ today }: { today: string }) {
   )
 }
 
-function Reflect({ parts, update, stats }: { parts: ReviewParts; update: (p: Partial<ReviewParts>) => void; stats: ReturnType<typeof weekStats> }) {
+function Reflect({ parts, update, stats, promised }: { parts: ReviewParts; update: (p: Partial<ReviewParts>) => void; stats: ReturnType<typeof weekStats>; promised: string[] }) {
+  // 上周的下一步里，还没在「事实」里提到的
+  const missing = promised.filter((x) => !parts.facts.includes(x))
   const field = (k: keyof ReviewParts, label: string, hint: string) => (
     <>
       <p class="group-label">{label}</p>
@@ -214,8 +258,19 @@ function Reflect({ parts, update, stats }: { parts: ReviewParts; update: (p: Par
     <>
       <p class="step-intro">数据会自动写进复盘，你只需要写三件事。</p>
       {field('facts', '事实', `这周发生了什么？只写事实。（完成 ${stats.completed.length} 件，记录 ${stats.daysLogged} 天）`)}
+      {missing.length > 0 && (
+        <div class="below">
+          <button
+            type="button"
+            class="text-btn small"
+            onClick={() => update({ facts: [parts.facts.trim(), ...missing.map((x) => `- 上周说「${x}」：`)].filter(Boolean).join('\n') })}
+          >
+            带入上周的 {missing.length} 条下一步
+          </button>
+        </div>
+      )}
       {field('patterns', '模式', '什么在重复？哪些事让状态变好或变差？说的和做的一致吗？')}
-      {field('next', '下一步', '最多 3 条，写成能执行的动作。下一页可以直接排进日程。')}
+      {field('next', '下一步', '最多 3 条，写成能执行的动作。每条都是一次小实验，下周复盘时先回来看它。')}
     </>
   )
 }

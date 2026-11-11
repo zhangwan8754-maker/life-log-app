@@ -298,16 +298,10 @@
   padding: 8px 12px 0;
 }
 
-.status-group {
-  margin-top: 22px;
-}
-.below + .status-group {
-  margin-top: 12px;
-}
 .done-group {
   margin-top: 4px;
 }
-.below + .group:not(.status-group) {
+.below + .group {
   margin-top: 4px;
 }
 .add-row.ghost .icon {
@@ -790,36 +784,6 @@
   font-size: 16px;
   color: var(--text-3);
 }
-.status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
-  padding: 14px 16px;
-  font-size: 16px;
-  color: var(--text-3);
-}
-.status button {
-  padding: 4px 0;
-  color: var(--text-3);
-}
-.status button.has {
-  color: var(--text-2);
-}
-.status b {
-  font-weight: 600;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-.status b.unset {
-  font-weight: 400;
-  color: var(--text-4);
-}
-.status i {
-  font-style: normal;
-  color: var(--text-4);
-}
-
 .score-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -2021,4 +1985,483 @@ mark {
 
 .group.loading {
   opacity: 0.6;
+}
+
+/* ────────────────────────────────────────────
+   v4 —— 围绕「捕获 → 沉淀 → 记忆 → 复盘 → 迭代」
+   ──────────────────────────────────────────── */
+
+/* ───── 今天：状态 ───── */
+.meters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px 16px 16px;
+  text-align: left;
+  transition: background 0.12s;
+}
+.meter + .meter {
+  box-shadow: inset 1px 0 0 var(--line);
+}
+.meter:active {
+  background: var(--fill);
+}
+.meter-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.meter-name {
+  font-size: 15px;
+  color: var(--text-3);
+}
+.meter b {
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.meter.unset b {
+  font-weight: 400;
+  color: var(--text-4);
+}
+.meter-bar {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+}
+.meter-bar i {
+  height: 5px;
+  border-radius: 2.5px;
+  background: var(--fill-2);
+  transition: background 0.2s;
+}
+.meter.mood .meter-bar i.on {
+  background: var(--mood);
+}
+.meter.energy .meter-bar i.on {
+  background: var(--energy);
+}
+
+.label-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.label-detail {
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.group-note.lead {
+  margin: 2px 16px 16px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.group-foot {
+  margin: 0;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--text-3);
+}
+.group.after {
+  margin-top: 22px;
+}
+
+/* ───── 今天：日记 ───── */
+.journal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  transition: background 0.12s;
+}
+.journal-card:active {
+  background: var(--fill);
+}
+.journal-excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  font-size: 17px;
+  line-height: 1.75;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.journal-meta {
+  font-size: 13px;
+  color: var(--accent);
+}
+.journal-hint {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 24px;
+  font-size: 17px;
+  color: var(--text-3);
+}
+.journal-hint .icon {
+  width: 24px;
+  color: var(--accent);
+}
+
+/* ───── 投入 ───── */
+.spent-bars {
+  display: grid;
+  gap: 11px;
+  margin: 0;
+  padding: 14px 16px 13px;
+  list-style: none;
+}
+.spent-bars li {
+  display: grid;
+  grid-template-columns: minmax(3.2em, 28%) 1fr auto;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+}
+.spent-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.spent-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--fill);
+  overflow: hidden;
+}
+.spent-track i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.spent-hours {
+  min-width: 2.6em;
+  text-align: right;
+  font-size: 15px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.spent-tap {
+  display: block;
+  width: 100%;
+  text-align: left;
+  transition: background 0.12s;
+}
+.spent-tap:active {
+  background: var(--fill);
+}
+.group .spent-tap + .row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+}
+.spent-sheet .chips {
+  margin-top: 12px;
+}
+.spent-label {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+}
+.spent-label b {
+  color: var(--text);
+  letter-spacing: 0;
+}
+.chip.dur:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.chip:active:not(:disabled) {
+  opacity: 0.6;
+}
+.spent-raw {
+  margin-top: 4px;
+}
+.spent-raw span {
+  font-size: 16px;
+}
+
+/* ───── 速记：页面上直接记；种类标签 ───── */
+.note-add.inline {
+  margin: 0;
+  padding: 0 16px;
+}
+.notes + .note-add.inline {
+  border-top: 1px solid var(--line);
+}
+.note-add.inline input {
+  width: 100%;
+  height: 52px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 17px;
+}
+.kind {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--text-2);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.6;
+  vertical-align: 2px;
+}
+.kind.learned {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.kind.question {
+  background: color-mix(in oklab, var(--mood) 18%, transparent);
+  color: color-mix(in oklab, var(--mood) 62%, var(--text));
+}
+.kinds .attr {
+  padding: 0 14px;
+}
+.attr.on {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 500;
+}
+
+/* ───── 记忆：时间线 ───── */
+.row.day-card {
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 0;
+  padding: 13px 16px;
+}
+.group .row.day-card + .row.day-card::before {
+  left: 62px;
+}
+.day-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+  width: 34px;
+}
+.day-date b {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.day-date small {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.day-date small.accent {
+  color: var(--accent);
+  font-weight: 600;
+  line-height: 25px;
+}
+.recall .day-date {
+  width: 52px;
+  align-items: flex-start;
+}
+.group.recall .row.day-card + .row.day-card::before {
+  left: 80px;
+}
+.day-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.day-excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 16px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.day-meta {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.day-scores {
+  display: flex;
+  gap: 4px;
+  flex: none;
+  padding-top: 1px;
+}
+.day-scores i {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.day-scores .mood {
+  background: color-mix(in oklab, var(--mood) 18%, transparent);
+  color: color-mix(in oklab, var(--mood) 62%, var(--text));
+}
+.day-scores .energy {
+  background: color-mix(in oklab, var(--energy) 16%, transparent);
+  color: color-mix(in oklab, var(--energy) 68%, var(--text));
+}
+.day-scores .none {
+  background: var(--fill);
+  color: var(--text-4);
+}
+.more {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 0;
+}
+
+/* ───── 记忆：模式 ───── */
+.row.pattern-row {
+  display: grid;
+  gap: 5px;
+  min-height: 0;
+  padding: 14px 16px;
+}
+.group .row.pattern-row + .row.pattern-row::before {
+  left: 16px;
+}
+.pattern-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pattern-id {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.status-chip {
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.status-chip.watching {
+  background: var(--fill);
+  color: var(--text-2);
+}
+.status-chip.holds {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.status-chip.rejected {
+  background: color-mix(in oklab, var(--late) 14%, transparent);
+  color: var(--late);
+}
+.pattern-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.pattern-note {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.verdict {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.verdict-btn {
+  height: 42px;
+  border-radius: 11px;
+  background: var(--fill);
+  font-size: 16px;
+  color: var(--text-2);
+  transition: background 0.15s, color 0.15s;
+}
+.verdict-btn.on {
+  font-weight: 600;
+}
+.verdict-btn.on.watching {
+  background: var(--fill-2);
+  color: var(--text);
+}
+.verdict-btn.on.holds {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.verdict-btn.on.rejected {
+  background: var(--late);
+  color: var(--on-accent);
+}
+.pattern-body {
+  font-size: 16px;
+}
+.pattern-sheet .hint a {
+  color: var(--accent);
+}
+
+/* ───── 提议 ───── */
+.proposal {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px 6px;
+}
+.proposal + .proposal {
+  border-top: 1px solid var(--line);
+}
+.proposal-n {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.proposal-main {
+  flex: 1;
+  min-width: 0;
+}
+.proposal .prose {
+  font-size: 16px;
+}
+.proposal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 20px;
+}
+
+/* ───── 复盘：上周说要做的 ───── */
+.promised ol {
+  margin: 0;
+  padding: 12px 16px 12px 40px;
+  font-size: 17px;
+  line-height: 1.7;
 }

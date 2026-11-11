@@ -124,11 +124,11 @@ export function parseNotes(md: string): Note[] {
   return out
 }
 
-export function appendNote(md: string, time: string, text: string): string {
-  return insertLine(md, '速记', `- ${time} ${oneLine(text)}`)
-}
-
 const noteLine = (time: string, text: string) => `- ${time ? `${time} ` : ''}${oneLine(text)}`
+
+export function appendNote(md: string, time: string, text: string): string {
+  return insertLine(md, '速记', noteLine(time, text))
+}
 
 /** 找到「速记」小节里第一条时间和内容都对得上的行 */
 function findNote(ls: string[], time: string, text: string): number {
@@ -179,6 +179,70 @@ export function score(v: string): number | null {
   const n = Number(v)
   return v !== '' && Number.isInteger(n) && n >= 1 && n <= 10 ? n : null
 }
+
+// ───────────── 速记的三种开头（都可选）─────────────
+// 投入：英语 1h，跑步 40min —— 时间花在哪；学到：…… —— 教训或发现；问题：…… —— 答不上来的问题
+
+export type NoteKind = 'plain' | 'spent' | 'learned' | 'question'
+export const KIND_LABEL: Record<Exclude<NoteKind, 'plain'>, string> = { spent: '投入', learned: '学到', question: '问题' }
+const KIND_OF: Record<string, NoteKind> = { 投入: 'spent', 学到: 'learned', 问题: 'question' }
+
+/** 速记属于哪一种，以及去掉开头后的内容 */
+export function noteKind(text: string): { kind: NoteKind; body: string } {
+  const m = text.match(/^(投入|学到|问题)(?:[:：]\s*|\s+)(.*)$/)
+  return m ? { kind: KIND_OF[m[1]], body: m[2].trim() } : { kind: 'plain', body: text }
+}
+
+export const withKind = (kind: NoteKind, body: string) => (kind === 'plain' ? body : `${KIND_LABEL[kind]}：${body}`)
+
+export interface Spent {
+  name: string
+  hours: number
+}
+
+const SPENT_PART = /^(.*?)[\s:：]*(\d+(?:\.\d+)?)\s*(h|hr|小时|个小时|min|m|分钟|分)$/i
+
+/** 「投入：英语 1h，读书 40min」→ 各项时长；不是投入速记返回 null。bad 是认不出时长的片段 */
+export function parseSpent(text: string): { items: Spent[]; bad: string[] } | null {
+  const k = noteKind(text)
+  if (k.kind !== 'spent') return null
+  const items: Spent[] = []
+  const bad: string[] = []
+  for (const part of k.body.split(/[，,、；;]/).map((p) => p.trim()).filter(Boolean)) {
+    const m = part.match(SPENT_PART)
+    const name = m?.[1].trim()
+    if (!m || !name) {
+      bad.push(part)
+      continue
+    }
+    const n = Number(m[2])
+    const hours = /^(h|hr|小时|个小时)$/i.test(m[3]) ? n : n / 60
+    const cur = items.find((x) => x.name === name)
+    if (cur) cur.hours += hours
+    else items.push({ name, hours })
+  }
+  return { items, bad }
+}
+
+/** 把若干条投入按名称合并，时长多的在前 */
+export function sumSpent(lists: Spent[][]): Spent[] {
+  const out: Spent[] = []
+  for (const s of lists.flat()) {
+    const cur = out.find((x) => x.name === s.name)
+    if (cur) cur.hours += s.hours
+    else out.push({ ...s })
+  }
+  return out.sort((a, b) => b.hours - a.hours)
+}
+
+/** 一天的投入合计 */
+export const daySpent = (md: string): Spent[] => sumSpent(parseNotes(md).map((n) => parseSpent(n.text)?.items ?? []))
+
+/** 1.5 → 1.5h，0.666 → 0.7h */
+export const fmtHours = (h: number) => `${Math.round(h * 10) / 10}h`
+
+/** 写进速记的时长：60 → 1h，90 → 1.5h，40 → 40min */
+export const fmtMinutes = (min: number) => (min % 30 === 0 && min >= 60 ? `${min / 60}h` : `${min}min`)
 
 // ───────────── 思想 ─────────────
 

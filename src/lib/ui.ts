@@ -51,9 +51,19 @@ const marked = new Marked({ gfm: true, breaks: true })
 // 记录里的原始 HTML 一律当作文本显示
 marked.use({ renderer: { html: ({ text }) => esc(text) } })
 
+/** 仓库里文件之间的相对链接 → App 里对应的页面 */
+function inAppLinks(src: string): string {
+  return src
+    .replace(/\]\((?:\.\.?\/)*days\/\d{4}\/(\d{4}-\d{2}-\d{2})\.md\)/g, '](#/day/$1)')
+    .replace(/\]\((?:\.\.?\/)*reviews\/([^)\s]+\.md)\)/g, '](#/file/reviews/$1)')
+    .replace(/\]\((?:\.\.?\/)*(?:memory\/)?(timeline|proposals)\.md\)/g, '](#/file/memory/$1.md)')
+    .replace(/\]\((?:\.\.?\/)*(?:memory\/)?patterns\.md\)/g, '](#/memory/patterns)')
+    .replace(/\]\((?:\.\.?\/)*me\.md\)/g, '](#/me)')
+}
+
 export function markdown(src: string): string {
-  return (marked.parse(src, { async: false }) as string)
-    .replace(/<a /g, '<a target="_blank" rel="noopener" ')
+  return (marked.parse(inAppLinks(src), { async: false }) as string)
+    .replace(/<a (?!href="#)/g, '<a target="_blank" rel="noopener" ')
     .replace(/<input /g, '<input disabled ')
 }
 

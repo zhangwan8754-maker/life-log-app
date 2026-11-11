@@ -27,6 +27,9 @@ const P: Record<string, string> = {
   journal: 'M6 4h10a2 2 0 0 1 2 2v14H8a2 2 0 0 1-2-2zM6 18a2 2 0 0 1 2-2h10M10 8h4',
   note: 'M5 5h14v10l-4 4H5zM15 19v-4h4',
   flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
+  memory: 'M4.6 9.5A8 8 0 1 1 4 12M4 5v4.5h4.5M12 7.8V12l3 1.9',
+  clock: 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM12 8v4.3l2.8 1.7',
+  pattern: 'M5 7h.01M5 12h.01M5 17h.01M9 7h10M9 12h10M9 17h6',
 }
 
 export function Icon({ name, size = 22, class: cls }: { name: keyof typeof P | string; size?: number; class?: string }) {

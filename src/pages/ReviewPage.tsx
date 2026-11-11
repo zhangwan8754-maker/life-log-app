@@ -1,15 +1,17 @@
 import { useState } from 'preact/hooks'
 import { addDays, cnMonthDay } from '../lib/dates'
 import { dayMd, useFile, useStore, useToday, useTree } from '../lib/hooks'
-import { getMeta, score } from '../lib/md'
+import { fmtHours, getMeta, score } from '../lib/md'
+import { parsePatterns, parseProposals, PATTERNS, PROPOSALS } from '../lib/memory'
 import { parseMe } from '../lib/me'
-import { aiPrompt, reviewPath, weekOf, weekStats, type WeekStats } from '../lib/review'
+import { aiPrompt, nextSteps, periodLabel, prevWeek, reviewPath, weekOf, weekStats, type WeekStats } from '../lib/review'
 import { store } from '../lib/store'
 import { go, toast } from '../lib/ui'
 import { Heatmap, type Metric, Trend } from '../components/Charts'
 import { ListRow, Tabs } from '../components/Controls'
 import { Icon } from '../components/Icon'
 import { Page } from '../components/Page'
+import { SpentBars } from '../components/Spent'
 import { titleOf } from './ThoughtPage'
 
 export const thoughtIndex = () =>
@@ -41,7 +43,7 @@ export function Stats({ s }: { s: WeekStats }) {
 export function ReviewPage() {
   const s = useStore()
   const today = useToday()
-  useTree('days/', 'thoughts/', 'reviews/')
+  useTree('days/', 'thoughts/', 'reviews/', 'memory/')
   const todo = useFile('todo.md') ?? ''
   const me = useFile('me.md') ?? ''
   const meDoc = parseMe(me)
@@ -51,7 +53,9 @@ export function ReviewPage() {
   const r = weekOf(today)
   const stats = weekStats(r, dayMd, todo, thoughtIndex(), today)
   const done = s.read(reviewPath(r))
-  const prev = weekOf(addDays(r.from, -1))
+  const prev = prevWeek(r)
+  const patterns = parsePatterns(s.read(PATTERNS))
+  const proposals = parseProposals(s.read(PROPOSALS))
   const prevMissing = s.treeLoaded && today <= addDays(r.from, 1) && !s.read(reviewPath(prev))
   const last30 = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29))
   const series = (k: Metric) => last30.map((d) => score(getMeta(dayMd(d) ?? '', k)))
@@ -82,6 +86,24 @@ export function ReviewPage() {
 
       <p class="group-label">本周</p>
       <Stats s={stats} />
+      {stats.spent.length > 0 && (
+        <>
+          <p class="group-label label-bar">
+            <span>本周投入</span>
+            <span class="label-detail">合计 {fmtHours(stats.spentTotal)}</span>
+          </p>
+          <div class="group spent-group">
+            <SpentBars items={stats.spent} />
+          </div>
+        </>
+      )}
+
+      <p class="group-label">迭代</p>
+      <div class="group">
+        <ListRow icon="sparkle" label="AI 的提议" detail={proposals.length ? `${proposals.length} 条等你决定` : '没有'} href="#/proposals" chev />
+        <ListRow icon="pattern" label="模式" detail={patterns.length ? `${patterns.filter((p) => p.status === '观察中').length} 条观察中` : '还没有'} href="#/memory/patterns" chev />
+        <ListRow icon="person" label="我是谁" detail={meDoc.filled ? `${meDoc.filled}/${meDoc.total}` : '未填写'} href="#/me" chev />
+      </div>
 
       <p class="group-label">近 30 天</p>
       <div class="group chart-group">
@@ -118,14 +140,13 @@ export function ReviewPage() {
           detail="本周上下文"
           onClick={async () => {
             try {
-              await navigator.clipboard.writeText(aiPrompt(r, me, dayMd, todo, stats))
+              await navigator.clipboard.writeText(aiPrompt(r, me, dayMd, todo, stats, { prevNext: nextSteps(s.read(reviewPath(prev))), patterns }))
               toast('已复制，粘贴到 Claude 里就能复盘')
             } catch {
               toast('复制失败，请检查浏览器权限')
             }
           }}
         />
-        <ListRow icon="person" label="我是谁" detail={meDoc.filled ? `${meDoc.filled}/${meDoc.total}` : '未填写'} href="#/me" chev />
         <ListRow icon="settings" label="设置" href="#/settings" chev />
       </div>
 
@@ -135,8 +156,7 @@ export function ReviewPage() {
           <div class="group">
             {reviews.slice(0, 20).map((p) => {
               const id = p.replace(/^reviews\/|\.md$/g, '')
-              const m = id.match(/^(\d{4})-W(\d+)$/)
-              return <ListRow icon="journal" label={m ? `${m[1]} 年第 ${Number(m[2])} 周` : id} href={`#/file/${encodeURIComponent(p)}`} chev />
+              return <ListRow icon="journal" label={periodLabel(id)} href={`#/file/${encodeURIComponent(p)}`} chev />
             })}
           </div>
         </>

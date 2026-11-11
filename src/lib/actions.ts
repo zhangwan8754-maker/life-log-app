@@ -1,5 +1,5 @@
 /** 任务相关的用户动作 + 全局弹层状态 */
-import { dayPath, ymd } from './dates'
+import { dayPath, hm, ymd } from './dates'
 import { store } from './store'
 import { INBOX, type Task } from './todo'
 import { Box, haptic, toast } from './ui'
@@ -89,6 +89,14 @@ export function deleteNote(n: NoteRef) {
     run: () => store.enqueue(dayPath(n.date), { kind: 'note.restore', date: n.date, time: n.time, text: n.text }),
   })
 }
+
+/** 记一条速记。补记过去某天的不带时间 */
+export function addNote(date: string, text: string) {
+  store.enqueue(dayPath(date), { kind: 'note', date, time: date === ymd() ? hm() : '', text })
+}
+
+/** 「记一笔投入」弹层：记到哪一天 */
+export const spentSheet = new Box<{ date: string } | null>(null)
 
 // ───── 提炼为思想：把速记带进新建思想页 ─────
 
