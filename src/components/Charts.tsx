@@ -119,16 +119,55 @@ export function MiniBars({ values, metric }: { values: (number | null)[]; metric
   )
 }
 
-/** 年度热力图：列 = 周（周一开始），行 = 星期 */
+/** 一排竖条：本周每天、最近几周。条的高矮按这一排里最大的算 */
+export function ColBars({ items, label }: { items: { key: string; label: string; value: number; text: string; href?: string; on?: boolean; dim?: boolean }[]; label: string }) {
+  const max = Math.max(...items.map((x) => x.value), 0.01)
+  return (
+    <div class="colbars" role="group" aria-label={label}>
+      {items.map((x) => {
+        const body = (
+          <>
+            <span class="colbar-num">{x.value > 0 ? x.text : ''}</span>
+            <span class="colbar-track" aria-hidden="true">
+              <i style={{ height: x.value > 0 ? `${Math.max(6, (x.value / max) * 100)}%` : '0' }} />
+            </span>
+            <span class="colbar-label">{x.label}</span>
+          </>
+        )
+        const cls = cx('colbar', x.on && 'on', x.dim && 'dim')
+        const aria = `${x.key} ${x.value > 0 ? x.text : '没有投入'}`
+        return x.href ? (
+          <a class={cls} href={x.href} aria-label={aria}>
+            {body}
+          </a>
+        ) : (
+          <span class={cls} aria-label={aria}>
+            {body}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+/** 年度热力图：列 = 周（周一开始），行 = 星期。情绪、精力是 1–10 分；投入按小时，颜色深浅由 level 给 */
 export function Heatmap({
   year,
   metric,
+  name = METRIC_NAME[metric as Metric] ?? '',
   value,
+  level = (v) => v / 10,
+  fmt = String,
   has,
 }: {
   year: number
-  metric: Metric
+  /** 决定颜色：mood / energy / spent */
+  metric: Metric | 'spent'
+  name?: string
   value: (date: string) => number | null
+  /** 数值 → 0–1 的深浅 */
+  level?: (v: number) => number
+  fmt?: (v: number) => string
   has: (date: string) => boolean
 }) {
   const wrap = useRef<HTMLDivElement>(null)
@@ -177,13 +216,13 @@ export function Heatmap({
                   <button
                     type="button"
                     class={cx('cell', !inYear && 'out', v !== null && `val ${metric}`, v === null && inYear && has(date) && 'has', date === today && 'today')}
-                    style={v !== null ? { '--v': v / 10 } : undefined}
+                    style={v !== null ? { '--v': Math.max(0, Math.min(1, level(v))) } : undefined}
                     disabled={!inYear}
-                    aria-label={`${date} ${METRIC_NAME[metric]} ${v ?? '无'}`}
+                    aria-label={`${date} ${name} ${v !== null ? fmt(v) : '无'}`}
                     onClick={() => go(`#/day/${date}`)}
                     onPointerEnter={(e) => {
                       const el = e.currentTarget as HTMLElement
-                      setTip({ x: el.offsetLeft + (el.parentElement?.offsetLeft ?? 0), y: el.offsetTop, text: `${date}　${METRIC_NAME[metric]} ${v ?? '—'}` })
+                      setTip({ x: el.offsetLeft + (el.parentElement?.offsetLeft ?? 0), y: el.offsetTop, text: `${date}　${name} ${v !== null ? fmt(v) : '—'}` })
                     }}
                     onPointerLeave={() => setTip(null)}
                   />

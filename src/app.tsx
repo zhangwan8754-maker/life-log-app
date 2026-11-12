@@ -4,6 +4,7 @@ import { useStore } from './lib/hooks'
 import { store } from './lib/store'
 import { INBOX, isLegacy } from './lib/todo'
 import { cx, toastBox, useBox } from './lib/ui'
+import * as A from './lib/actions'
 import { GlobalSheets } from './components/GlobalSheets'
 import { BrandMark, Icon } from './components/Icon'
 import { FilePage } from './pages/FilePage'
@@ -154,6 +155,7 @@ export function App() {
   const s = useStore()
   const r = useRoute()
   const connected = !!s.config
+  const timing = useBox(A.timer)
 
   useEffect(() => {
     if (!connected && r.name !== 'settings') location.replace('#/settings')
@@ -197,6 +199,7 @@ export function App() {
             <a href={href} class={cx(tab === id && 'on')} aria-current={tab === id ? 'page' : undefined}>
               <Icon name={icon} size={25} />
               <span>{label}</span>
+              {id === 'today' && timing && <i class={cx('tab-dot', !!timing.paused && 'paused')} aria-label="正在计时" />}
             </a>
           ))}
         </nav>

@@ -9,8 +9,8 @@ import { Icon } from './Icon'
 import { NoteRow } from './NoteSheet'
 import { Sheet } from './Sheet'
 
-/** 时间花在哪：每项一行，条的长短按最长的一项算 */
-export function SpentBars({ items }: { items: Spent[] }) {
+/** 时间花在哪：每项一行，条的长短按最长的一项算。给了 days 就在时长后面写上这几天里有几天做了它 */
+export function SpentBars({ items, days }: { items: Spent[]; days?: Record<string, number> }) {
   const max = Math.max(...items.map((x) => x.hours), 0.01)
   return (
     <ul class="spent-bars">
@@ -20,7 +20,10 @@ export function SpentBars({ items }: { items: Spent[] }) {
           <span class="spent-track" aria-hidden="true">
             <i style={{ width: `${Math.max(4, (x.hours / max) * 100)}%` }} />
           </span>
-          <span class="spent-hours">{fmtHours(x.hours)}</span>
+          <span class="spent-hours">
+            {fmtHours(x.hours)}
+            {days?.[x.name] ? <small> · {days[x.name]} 天</small> : null}
+          </span>
         </li>
       ))}
     </ul>
@@ -162,19 +165,22 @@ const startedAt = (start: number) => {
 /** 正在计时：「今天」页最上面的一张卡片。结束就记成一笔投入 */
 export function TimerCard() {
   const t = useBox(A.timer)
-  const now = useNow(!!t)
+  const now = useNow(!!t && !t.paused)
   if (!t) return null
   return (
-    <div class="group timer-card">
-      <div class="timer-top" role="timer" aria-label={`正在给${t.name}计时`}>
+    <div class={cx('group timer-card', !!t.paused && 'paused')}>
+      <div class="timer-top" role="timer" aria-label={t.paused ? `${t.name}的计时已暂停` : `正在给${t.name}计时`}>
         <span class="timer-dot" aria-hidden="true" />
         <span class="timer-name">{t.name}</span>
-        <span class="timer-clock">{clock(now - t.start)}</span>
+        <span class="timer-clock">{clock(A.timerElapsed(t, now))}</span>
       </div>
       <div class="timer-bottom">
-        <span class="timer-since">{startedAt(t.start)} 开始</span>
+        <span class="timer-since">{t.paused ? '已暂停' : `${startedAt(t.start)} 开始`}</span>
         <button type="button" class="text-btn muted small" onClick={A.discardTimer}>
           放弃
+        </button>
+        <button type="button" class="text-btn small" onClick={A.toggleTimerPause}>
+          {t.paused ? '继续' : '暂停'}
         </button>
         <button type="button" class="btn tonal small" onClick={A.stopTimer}>
           结束并记下
@@ -212,7 +218,7 @@ export function TimerStopSheet() {
           }}
         >
           <p class="sheet-sub">
-            「{t.name}」从 {startedAt(t.start)} 开始计时，已经过了 {A.minutesLabel(A.timerMinutes(t))}，像是忘了结束。实际学了多少分钟？
+            「{t.name}」从 {startedAt(t.start)} 开始计时，不算暂停已经过了 {A.minutesLabel(A.timerMinutes(t))}，像是忘了结束。实际学了多少分钟？
           </p>
           <input
             ref={input}

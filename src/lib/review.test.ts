@@ -49,8 +49,8 @@ describe('统计与复盘文件', () => {
     const p = aiPrompt(r, '---\nupdated: x\n---\n# 我是谁\n\n## 价值观\n- 自由\n', (d) => days[d], todo, s)
     expect(p).toContain('复盘 2026-W45（2026-11-02 至 2026-11-08）')
     expect(p).toContain('- 自由')
-    expect(p).toContain('### 2026-11-02（情绪 6，精力 5）\n周一跑步')
-    expect(p).toContain('### 2026-11-04（情绪 8，精力 —）\n（无日记）')
+    expect(p).toContain('### 2026-11-02 周一（情绪 6，精力 5）\n周一跑步')
+    expect(p).toContain('### 2026-11-04 周三（情绪 8，精力 —）\n（无日记）')
     expect(p).toContain('- 读书（目标：24 本）：读完 @2026-11-10')
     expect(p).not.toContain('updated: x')
   })
@@ -105,10 +105,45 @@ describe('投入、下一步、叫法', () => {
     const s = weekStats(r, (d) => days[d], todo, '2026-11-05')
     const p = aiPrompt(r, '', (d) => days[d], todo, s, {
       prevNext: ['早睡'],
-      patterns: [{ heading: 'P1 x', id: 'P1', title: '睡够的日子精力更好', status: '观察中', note: '', body: '' }],
+      patterns: [{ heading: 'P1 x', id: 'P1', title: '睡够的日子精力更好', status: '观察中', note: '', body: '证据\n- [11-02](../days/2026/2026-11-02.md) 精力 5' }],
     })
     expect(p).toContain('## 上周说的下一步\n- 早睡')
-    expect(p).toContain('- P1 睡够的日子精力更好（观察中）')
-    expect(aiPrompt(r, '', (d) => days[d], todo, s)).not.toContain('模式账本（')
+    // 模式带上证据和反例，链接只留文字
+    expect(p).toContain('### P1 睡够的日子精力更好（观察中）\n证据\n- 11-02 精力 5')
+    const bare = aiPrompt(r, '', (d) => days[d], todo, s)
+    expect(bare).not.toContain('模式账本（')
+    expect(bare).toContain('## 上周说的下一步\n（上周没有写）')
+  })
+
+  it('AI 提示词：每天一行的数据、每科几天、对目标、和上周比、记忆、怎么回答', async () => {
+    const { aiPrompt, weekOf, weekStats } = await import('./review')
+    const r = weekOf('2026-11-12')
+    const ds: Record<string, string> = {
+      '2026-11-03': day('2026-11-03', 6, 7, ['投入：数学 1h']),
+      '2026-11-09': day('2026-11-09', 8, 7, ['投入：英语语法 1h，数学 30min'], '只背了单词'),
+      '2026-11-11': day('2026-11-11', 3, 6, ['投入：数学 2h']),
+      '2026-11-12': day('2026-11-12', '', '', []),
+    }
+    const me = '# 我是谁\n\n## 方向\n\n### 每周投入\n\n- 数学 10h\n- 英语 14h\n'
+    const md = (d: string) => ds[d]
+    const s = weekStats(r, md, todo, '2026-11-12', me)
+    const p = aiPrompt(r, me, md, todo, s, {
+      today: '2026-11-12',
+      prev: weekStats(weekOf('2026-11-03'), md, todo, '2026-11-12', me),
+      timeline: '---\nthrough: 2026-11-11\n---\n# 大事记\n\n> 说明文字\n\n- [11-08](../days/2026/2026-11-08.md)（9 / 8）进博会\n',
+      pending: [{ name: 'Claude', n: 6, text: '「还没想清楚」← 数学到底要不要每天学？见 [模式账本 P3](../patterns.md)\n续行不要' }],
+    })
+    expect(p).toContain('今天是 2026-11-12（周四），这一周还没过完')
+    expect(p).toContain('| 2026-11-09 | 一 | 8 | 7 | 5 | 英语语法 1h、数学 0.5h |')
+    expect(p).toContain('| 2026-11-12 | 四 | — | — | 0 | — |')
+    expect(p).toContain('- 数学：2.5h，2 天\n- 英语语法：1h，1 天\n- 合计 3.5h；过去的 4 天里有 2 天记了投入')
+    expect(p).toContain('- 数学：2.5h / 10h（25%）\n- 英语：1h / 14h（7%）')
+    expect(p).toContain('### 和上周比（上周 → 这周，这周还没过完）\n\n- 记录天数：1 → 3\n- 情绪均值：6.0 → 5.5\n- 精力均值：7.0 → 6.5\n- 投入：1h → 3.5h')
+    expect(p).toContain('## 大事记（更早发生过什么，只有事实）\n- 11-08（9 / 8）进博会\n')
+    expect(p).toContain('- Claude 第 6 条：「还没想清楚」← 数学到底要不要每天学？见 模式账本 P3\n')
+    expect(p).not.toContain('续行不要')
+    expect(p).toContain('### 下一步\n最多 3 条，每条一行')
+    // 过完的一周不提「还没过完」
+    expect(aiPrompt(r, me, md, todo, s, { today: '2026-11-20' })).not.toContain('还没过完')
   })
 })

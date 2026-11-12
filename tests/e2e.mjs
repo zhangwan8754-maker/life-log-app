@@ -555,7 +555,7 @@ try {
     await page.locator('.main .row', { hasText: '复制给 AI' }).click()
     await page.getByText('已复制').waitFor()
     const clip = await page.evaluate(() => navigator.clipboard.readText())
-    assert.ok(clip.includes('和我自己比，不和别人比') && clip.includes('还没验证') && clip.includes('### 这学期\n\n过四级'))
+    assert.ok(clip.includes('和上一周的我比，不和别人比') && clip.includes('还没验证') && clip.includes('### 这学期\n\n过四级'))
   })
 
   await step('记忆 · 模式：AI 记下的假设，由我裁决', async () => {
@@ -632,7 +632,9 @@ try {
     await page.locator('.main .row', { hasText: '复制给 AI' }).click()
     await page.getByText('已复制').waitFor()
     const clip = await page.evaluate(() => navigator.clipboard.readText())
-    assert.ok(clip.includes('- P1 睡够七小时的日子，精力分更高（成立）') && clip.includes('- P2 事情一多，先被推掉的是健身（观察中）'), '复盘上下文带上模式账本')
+    assert.ok(clip.includes('## 请这样回答') && clip.includes('### 每天\n\n| 日期 | 周 |') && clip.includes('### 和上周比') && clip.includes('## 大事记'), '复盘上下文有每天的数据、和上周比、大事记、回答格式')
+    assert.ok(clip.includes('## 已经提过、还在等我决定的建议（不要重复）') && /\n- Claude 第 \d+ 条：/.test(clip) && /\n- DeepSeek 第 \d+ 条：/.test(clip), '带上各个 AI 还挂着的建议')
+    assert.ok(clip.includes('### P1 睡够七小时的日子，精力分更高（成立）') && clip.includes('### P2 事情一多，先被推掉的是健身（观察中）'), '复盘上下文带上模式账本')
   })
 
   await step('每周目标：在「数据」里设，按名称对上这一周实际的投入', async () => {
@@ -654,6 +656,18 @@ try {
     assert.equal((await hours('英语')).replace(/\s+/g, ' '), '1.5h / 3h')
     assert.equal((await hours('数学')).replace(/\s+/g, ' '), '0h / 10h')
     assert.equal(await page.locator('.label-btn').innerText(), '改目标')
+    // 学习时间：本周每天一根竖条（今天那根标出来）、每科学了几天、最近 8 周；热力图默认看投入
+    const todayBar = page.locator('.stats-page .colbars[aria-label="本周每天的投入"] .colbar.on')
+    assert.equal(await todayBar.locator('.colbar-num').innerText(), '2.3h')
+    assert.equal(await page.locator('.stats-page .colbars[aria-label="本周每天的投入"] .colbar').count(), 7)
+    await page.locator('.stats-page .study-line', { hasText: /日均 [\d.]+h · 1\/\d 天有投入/ }).waitFor()
+    assert.match((await page.locator('.stats-page .spent-bars:not(.target-bars) li', { hasText: '英语' }).locator('.spent-hours').innerText()).replace(/\s+/g, ' '), /^1\.5h · 1 天$/)
+    assert.equal(await page.locator('.stats-page .colbars[aria-label="最近 8 周每周的投入"] .colbar').count(), 8)
+    assert.equal(await page.locator('.stats-page .colbars[aria-label="最近 8 周每周的投入"] .colbar.on .colbar-num').innerText(), '2.3h')
+    await page.locator('.stats-page .heat .cell.today.val.spent').waitFor()
+    assert.equal(await page.locator('.stats-page .heat .cell.today').getAttribute('aria-label'), `${TODAY} 投入 2.3h`)
+    await page.locator('.stats-page .row-label-bar .tabs button', { hasText: '情绪' }).click()
+    await page.locator('.stats-page .heat .cell.today.val.mood').waitFor()
     // 「今天」页只多一行；「我是谁」里点开的是同一个弹层；每周复盘的回顾里也有
     await page.goto(BASE + '#/')
     await until(async () => (await dayNotes.locator('.target-line .spent-line-items').innerText().catch(() => '')) === '英语 1.5h/3h · 数学 0h/10h', '今天页的本周目标')
@@ -678,12 +692,24 @@ try {
     await sheet.locator('.spent-names .chip', { hasText: '英语' }).click()
     await sheet.locator('.timer-start').click()
     await card.locator('.timer-name', { hasText: '英语' }).waitFor()
-    // 相当于过了 47 分钟；关掉页面再回来，计时还在走
+    // 相当于一小时前开始、中间暂停过 13 分钟：算 47 分钟。关掉页面再回来，计时还在走
     await page.evaluate(() => {
       const t = JSON.parse(localStorage.getItem('ll.timer'))
-      localStorage.setItem('ll.timer', JSON.stringify({ ...t, start: t.start - 47 * 60000 }))
+      localStorage.setItem('ll.timer', JSON.stringify({ ...t, start: t.start - 60 * 60000, gap: 13 * 60000 }))
     })
     await page.reload()
+    await card.locator('.timer-clock', { hasText: /^47:\d\d$/ }).waitFor()
+    // 暂停时钟不走；别的页面上「今天」那一格有个小点
+    await card.locator('.text-btn', { hasText: '暂停' }).click()
+    await card.locator('.timer-since', { hasText: '已暂停' }).waitFor()
+    const frozen = await card.locator('.timer-clock').innerText()
+    await page.waitForTimeout(1300)
+    assert.equal(await card.locator('.timer-clock').innerText(), frozen, '暂停后时钟还在走')
+    await tab('计划')
+    await page.locator('.tabbar .tab-dot.paused').waitFor()
+    await tab('今天')
+    await card.locator('.text-btn', { hasText: '继续' }).click()
+    await card.locator('.timer-since', { hasText: '开始' }).waitFor()
     await card.locator('.timer-clock', { hasText: /^47:\d\d$/ }).waitFor()
     await dayNotes.locator('.spent-btn').click()
     await sheet.locator('.timer-note', { hasText: '正在给「英语」计时' }).waitFor()

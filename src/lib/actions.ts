@@ -109,6 +109,10 @@ export interface Timer {
   name: string
   /** 开始的时刻，毫秒 */
   start: number
+  /** 已经暂停掉的时间，毫秒 */
+  gap?: number
+  /** 正在暂停：从哪一刻开始停的 */
+  paused?: number
 }
 const TIMER_KEY = 'll.timer'
 /** 超过这么久，多半是忘了结束：先问实际学了多久，不直接记 */
@@ -117,7 +121,8 @@ export const LONG_TIMER_MIN = 240
 function loadTimer(): Timer | null {
   try {
     const t = JSON.parse(localStorage.getItem(TIMER_KEY) ?? 'null')
-    return t && typeof t.name === 'string' && typeof t.start === 'number' ? { name: t.name, start: t.start } : null
+    if (!t || typeof t.name !== 'string' || typeof t.start !== 'number') return null
+    return { name: t.name, start: t.start, gap: typeof t.gap === 'number' ? t.gap : 0, ...(typeof t.paused === 'number' ? { paused: t.paused } : {}) }
   } catch {
     return null
   }
@@ -139,13 +144,25 @@ if (typeof addEventListener === 'function')
     if (e.key === TIMER_KEY) timer.set(loadTimer())
   })
 
-export const timerMinutes = (t: Timer, now = Date.now()) => Math.max(0, Math.round((now - t.start) / 60000))
+/** 真正在学的时间（不算暂停），毫秒 */
+export const timerElapsed = (t: Timer, now = Date.now()) => Math.max(0, (t.paused ?? now) - t.start - (t.gap ?? 0))
+export const timerMinutes = (t: Timer, now = Date.now()) => Math.round(timerElapsed(t, now) / 60000)
 /** 47 → 47 分钟，125 → 2 小时 5 分 */
 export const minutesLabel = (min: number) => (min < 60 ? `${min} 分钟` : `${Math.floor(min / 60)} 小时${min % 60 ? ` ${min % 60} 分` : ''}`)
 
 export function startTimer(name: string) {
-  setTimer({ name, start: Date.now() })
+  setTimer({ name, start: Date.now(), gap: 0 })
   haptic(10)
+}
+
+/** 暂停 / 继续：休息的时间不算进投入 */
+export function toggleTimerPause() {
+  const t = timer.value
+  if (!t) return
+  const now = Date.now()
+  if (t.paused) setTimer({ name: t.name, start: t.start, gap: (t.gap ?? 0) + (now - t.paused) })
+  else setTimer({ ...t, paused: now })
+  haptic(8)
 }
 
 /** 结束计时，记成今天的一笔投入；撤销会删掉这一笔并接着计时 */

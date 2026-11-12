@@ -1,14 +1,15 @@
 import { useState } from 'preact/hooks'
 import * as A from '../lib/actions'
-import { addDays, cnMonthDay } from '../lib/dates'
+import { addDays, cnMonthDay, shortWeekday } from '../lib/dates'
 import { dayMd, useFile, useStore, useToday, useTree } from '../lib/hooks'
 import { fmtHours, getMeta, score } from '../lib/md'
 import { parseMe } from '../lib/me'
-import { parsePatterns, PATTERNS } from '../lib/memory'
+import { parsePatterns, PATTERNS, TIMELINE } from '../lib/memory'
 import { aiPrompt, nextSteps, periodLabel, prevWeek, reviewPath, weekOf, weekStats, type WeekStats } from '../lib/review'
 import { store } from '../lib/store'
+import { hoursOf, spentByDay, streak, subjectDays, weeklyHours } from '../lib/study'
 import { go, toast } from '../lib/ui'
-import { Heatmap, type Metric, Trend } from '../components/Charts'
+import { ColBars, Heatmap, type Metric, Trend } from '../components/Charts'
 import { ListRow, Tabs } from '../components/Controls'
 import { Icon } from '../components/Icon'
 import { Empty, Page } from '../components/Page'
@@ -106,7 +107,14 @@ export function ReviewPage() {
           detail="本周上下文"
           onClick={async () => {
             try {
-              await navigator.clipboard.writeText(aiPrompt(r, me, dayMd, todo, stats, { prevNext: nextSteps(s.read(reviewPath(prev))), patterns: parsePatterns(s.read(PATTERNS)) }))
+              await navigator.clipboard.writeText(aiPrompt(r, me, dayMd, todo, stats, {
+                  prevNext: nextSteps(s.read(reviewPath(prev))),
+                  patterns: parsePatterns(s.read(PATTERNS)),
+                  today,
+                  prev: weekStats(prev, dayMd, todo, today, me),
+                  timeline: s.read(TIMELINE),
+                  pending: all.flatMap((a) => a.items.map((p) => ({ name: a.name, n: p.n, text: p.text }))),
+                }))
               toast('已复制，粘贴给任何一个 AI 都能复盘')
             } catch {
               toast('复制失败，请检查浏览器权限')
@@ -119,12 +127,12 @@ export function ReviewPage() {
   )
 }
 
-/** 数据：本周数字、投入、近 30 天趋势、年度热力图 */
+/** 数据：本周数字、学习时间（每天、每科、每周）、近 30 天趋势、年度热力图 */
 export function StatsPage() {
   const today = useToday()
   useTree('days/')
   const todo = useFile('todo.md') ?? ''
-  const [metric, setMetric] = useState<Metric>('mood')
+  const [metric, setMetric] = useState<Metric | 'spent'>('spent')
   const [year, setYear] = useState(Number(today.slice(0, 4)))
   const me = useFile('me.md')
 
@@ -132,6 +140,14 @@ export function StatsPage() {
   const stats = weekStats(r, dayMd, todo, today, me)
   const last30 = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29))
   const series = (k: Metric) => last30.map((d) => score(getMeta(dayMd(d) ?? '', k)))
+  // 学习时间：本周每天、每科几天、最近 8 周
+  const week = spentByDay(r.days, dayMd)
+  const past = r.days.filter((d) => d <= today).length
+  const studied = week.filter((d) => d.hours > 0).length
+  const run = streak(today, dayMd)
+  const weeks = weeklyHours(r.from, 8, dayMd)
+  const everSpent = weeks.some((w) => w.hours > 0)
+  const studyLine = [`日均 ${fmtHours(stats.spentTotal / past)}`, `${studied}/${past} 天有投入`, run > 1 && `连续 ${run} 天`].filter(Boolean).join(' · ')
   const hasTrend = series('mood').some((v) => v !== null) || series('energy').some((v) => v !== null)
 
   return (
@@ -147,14 +163,53 @@ export function StatsPage() {
       <div class="group spent-group">
         {stats.targets.length ? <TargetBars items={stats.targets} /> : <p class="group-empty">给每科定一个每周目标，比如数学 10 小时。这里会显示这一周实际投入了多少。</p>}
       </div>
+      <p class="group-label label-bar">
+        <span>本周学习时间</span>
+        <span class="label-detail">合计 {fmtHours(stats.spentTotal)}</span>
+      </p>
+      <div class="group study-group">
+        {stats.spentTotal > 0 ? (
+          <>
+            <ColBars
+              label="本周每天的投入"
+              items={week.map((d) => ({
+                key: d.date,
+                label: shortWeekday(d.date).replace(/^周/, ''),
+                value: d.hours,
+                text: fmtHours(d.hours),
+                href: d.date <= today ? (d.date === today ? '#/' : `#/day/${d.date}`) : undefined,
+                on: d.date === today,
+                dim: d.date > today,
+              }))}
+            />
+            <p class="study-line">{studyLine}</p>
+          </>
+        ) : (
+          <p class="group-empty">这周还没有记投入。在「今天」页点「记投入」，或者开始计时。</p>
+        )}
+      </div>
       {stats.spent.length > 0 && (
         <>
-          <p class="group-label label-bar">
-            <span>本周投入</span>
-            <span class="label-detail">合计 {fmtHours(stats.spentTotal)}</span>
-          </p>
+          <p class="group-label">按科目</p>
           <div class="group spent-group">
-            <SpentBars items={stats.spent} />
+            <SpentBars items={stats.spent} days={subjectDays(week)} />
+          </div>
+        </>
+      )}
+      {everSpent && (
+        <>
+          <p class="group-label">最近 8 周</p>
+          <div class="group study-group">
+            <ColBars
+              label="最近 8 周每周的投入"
+              items={weeks.map((w) => ({
+                key: `${w.from} 起的一周`,
+                label: w.from === r.from ? '本周' : w.from.slice(5).replace('-', '/'),
+                value: w.hours,
+                text: fmtHours(w.hours),
+                on: w.from === r.from,
+              }))}
+            />
           </div>
         </>
       )}
@@ -177,6 +232,7 @@ export function StatsPage() {
         <Tabs
           value={metric}
           options={[
+            { value: 'spent', label: '投入' },
             { value: 'mood', label: '情绪' },
             { value: 'energy', label: '精力' },
           ]}
@@ -184,7 +240,12 @@ export function StatsPage() {
         />
       </div>
       <div class="group chart-group">
-        <Heatmap year={year} metric={metric} value={(d) => score(getMeta(dayMd(d) ?? '', metric))} has={(d) => !!dayMd(d)} />
+        {metric === 'spent' ? (
+          // 颜色到 6 小时封顶：再多也是最深的一格
+          <Heatmap year={year} metric="spent" name="投入" value={(d) => hoursOf(dayMd(d)) || null} level={(h) => h / 6} fmt={fmtHours} has={(d) => !!dayMd(d)} />
+        ) : (
+          <Heatmap year={year} metric={metric} value={(d) => score(getMeta(dayMd(d) ?? '', metric))} has={(d) => !!dayMd(d)} />
+        )}
       </div>
     </Page>
   )
