@@ -8,7 +8,8 @@ import { Pie, Tabs, WhenPicker, whenLabel } from './Controls'
 import { Icon } from './Icon'
 import { NoteSheet } from './NoteSheet'
 import { Sheet } from './Sheet'
-import { SpentSheet } from './Spent'
+import { SpentSheet, TimerStopSheet } from './Spent'
+import { TargetSheet } from './Targets'
 
 const stripDate = (key: string) => withDate(key, '')
 
@@ -290,6 +291,8 @@ export function GlobalSheets() {
       <TaskSheet />
       <DateSheet />
       <SpentSheet />
+      <TimerStopSheet />
+      <TargetSheet />
       <NoteSheet />
     </>
   )

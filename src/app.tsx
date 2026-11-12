@@ -4,6 +4,7 @@ import { useStore } from './lib/hooks'
 import { store } from './lib/store'
 import { INBOX, isLegacy } from './lib/todo'
 import { cx, toastBox, useBox } from './lib/ui'
+import * as A from './lib/actions'
 import { GlobalSheets } from './components/GlobalSheets'
 import { BrandMark, Icon } from './components/Icon'
 import { FilePage } from './pages/FilePage'
@@ -16,7 +17,6 @@ import { UpcomingPage } from './pages/UpcomingPage'
 import { ProjectPage } from './pages/ProjectPage'
 import { HistoryPage, ReviewPage, StatsPage } from './pages/ReviewPage'
 import { SettingsPage } from './pages/SettingsPage'
-import { ThoughtPage } from './pages/ThoughtPage'
 import { TodayPage } from './pages/TodayPage'
 import { WeekPage } from './pages/WeekPage'
 
@@ -32,7 +32,7 @@ const parse = (): Route => {
 /** 层级：四个主页 0，进入一层 1，再深一层 2。决定切换动画的方向 */
 const DEPTH: Record<string, number> = {
   '': 0, day: 0, home: 0, plan: 0, memory: 0, notes: 0, review: 0,
-  upcoming: 1, project: 1, journal: 1, thought: 1, week: 1, me: 1, settings: 1, advice: 1, proposals: 1, stats: 1, history: 1,
+  upcoming: 1, project: 1, journal: 1, week: 1, me: 1, settings: 1, advice: 1, proposals: 1, stats: 1, history: 1,
   file: 2,
 }
 
@@ -40,7 +40,7 @@ type Tab = 'today' | 'plan' | 'memory' | 'review'
 const TAB_OF: Record<string, Tab> = {
   '': 'today', day: 'today', journal: 'today',
   home: 'plan', plan: 'plan', upcoming: 'plan', project: 'plan',
-  memory: 'memory', notes: 'memory', thought: 'memory',
+  memory: 'memory', notes: 'memory',
   review: 'review', week: 'review', me: 'review', file: 'review', settings: 'review', advice: 'review', proposals: 'review', stats: 'review', history: 'review',
 }
 const TABS: [Tab, string, string, string][] = [
@@ -94,7 +94,7 @@ function useRoute(): Route {
 }
 
 function Page({ r }: { r: Route }) {
-  const [a = '', b = ''] = r.args
+  const [a = ''] = r.args
   switch (r.name) {
     case 'home':
     case 'plan': return <PlanHome />
@@ -103,14 +103,13 @@ function Page({ r }: { r: Route }) {
     case 'journal': return <JournalPage date={a} />
     case 'upcoming': return <UpcomingPage />
     case 'project': return <ProjectPage name={a} />
-    case 'memory': return <MemoryPage seg={a === 'notes' || a === 'thoughts' || a === 'patterns' ? a : 'timeline'} />
+    case 'memory': return <MemoryPage seg={a === 'notes' || a === 'patterns' ? a : 'timeline'} />
     // 旧地址：笔记 → 记忆
-    case 'notes': return <MemoryPage seg={a === 'stream' ? 'notes' : 'thoughts'} />
+    case 'notes': return <MemoryPage seg="notes" />
     case 'advice':
     case 'proposals': return <AdvicePage agent={a} />
     case 'stats': return <StatsPage />
     case 'history': return <HistoryPage />
-    case 'thought': return <ThoughtPage arg={[a, b].filter(Boolean).join('/')} />
     case 'review': return <ReviewPage />
     case 'week': return <WeekPage id={a} />
     case 'me': return <MePage />
@@ -156,6 +155,7 @@ export function App() {
   const s = useStore()
   const r = useRoute()
   const connected = !!s.config
+  const timing = useBox(A.timer)
 
   useEffect(() => {
     if (!connected && r.name !== 'settings') location.replace('#/settings')
@@ -199,6 +199,7 @@ export function App() {
             <a href={href} class={cx(tab === id && 'on')} aria-current={tab === id ? 'page' : undefined}>
               <Icon name={icon} size={25} />
               <span>{label}</span>
+              {id === 'today' && timing && <i class={cx('tab-dot', !!timing.paused && 'paused')} aria-label="正在计时" />}
             </a>
           ))}
         </nav>

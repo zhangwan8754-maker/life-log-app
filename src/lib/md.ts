@@ -243,25 +243,3 @@ export const fmtHours = (h: number) => `${Math.round(h * 10) / 10}h`
 
 /** 写进速记的时长：60 → 1h，90 → 1.5h，40 → 40min */
 export const fmtMinutes = (min: number) => (min % 30 === 0 && min >= 60 ? `${min / 60}h` : `${min}min`)
-
-// ───────────── 思想 ─────────────
-
-export function safeTitle(s: string): string {
-  return oneLine(s).replace(/[\\/:*?"<>|#\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)
-}
-
-export function newThought(title: string, body: string, date: string, from = ''): string {
-  return `---\ncreated: ${date}\ntags: []\nfrom: ${from}\n---\n# ${title}\n\n${body.trim()}\n`
-}
-
-/** 思想卡片正文（去掉 frontmatter 和一级标题） */
-export function thoughtBody(md: string): string {
-  return stripFrontmatter(md).replace(/^\s*# .*\n?/, '').trim()
-}
-
-export function setThoughtBody(md: string, title: string, body: string): string {
-  const ls = lines(md)
-  const r = fmRange(ls)
-  const fm = r ? ls.slice(0, r[1] + 1).join('\n') + '\n' : ''
-  return `${fm}# ${title}\n\n${body.trim()}\n`
-}

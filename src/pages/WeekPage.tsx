@@ -14,15 +14,16 @@ import { Icon } from '../components/Icon'
 import { Empty, Page } from '../components/Page'
 import { NoteRow } from '../components/NoteSheet'
 import { SpentBars } from '../components/Spent'
+import { TargetBars } from '../components/Targets'
 import { TaskRow } from '../components/TaskRow'
-import { Stats, thoughtIndex } from './ReviewPage'
+import { Stats } from './ReviewPage'
 
 const STEPS = ['回顾', '清理', '反思', '计划'] as const
 
 export function WeekPage({ id }: { id: string }) {
   const r = weekFromId(id)
   const today = useToday()
-  useTree('days/', 'thoughts/')
+  useTree('days/')
   const { md: todo } = useTodo()
   const me = useFile('me.md') ?? ''
   const path = r ? reviewPath(r) : null
@@ -44,7 +45,7 @@ export function WeekPage({ id }: { id: string }) {
     () =>
       debounce((p: ReviewParts) => {
         if (!r || !path) return
-        const s = weekStats(r, dayMd, store.read('todo.md') ?? '', thoughtIndex(), today)
+        const s = weekStats(r, dayMd, store.read('todo.md') ?? '', today, store.read('me.md'))
         store.enqueue(path, { kind: 'write', content: reviewMarkdown(r, s, p, store.read(path)), label: `复盘 ${r.id}` })
       }, 1200),
     [id],
@@ -58,7 +59,7 @@ export function WeekPage({ id }: { id: string }) {
       </Page>
     )
 
-  const stats = weekStats(r, dayMd, todo, thoughtIndex(), today)
+  const stats = weekStats(r, dayMd, todo, today, me)
   const update = (patch: Partial<ReviewParts>) => {
     const p = { ...parts, ...patch }
     setParts(p)
@@ -134,6 +135,14 @@ function Recap({ r, stats, promised }: { r: NonNullable<ReturnType<typeof weekFr
         </>
       )}
       <Stats s={stats} />
+      {stats.targets.length > 0 && (
+        <>
+          <p class="group-label">每周目标</p>
+          <div class="group spent-group">
+            <TargetBars items={stats.targets} />
+          </div>
+        </>
+      )}
       {stats.spent.length > 0 && (
         <>
           <p class="group-label label-bar">
@@ -191,15 +200,6 @@ function Recap({ r, stats, promised }: { r: NonNullable<ReturnType<typeof weekFr
                 <NoteRow date={n.date} note={n} />
               ))}
             </ul>
-            <p class="group-foot">点开一条，可以提炼成思想。</p>
-          </div>
-        </>
-      )}
-      {stats.thoughts.length > 0 && (
-        <>
-          <p class="group-label">新的思想</p>
-          <div class="group">
-            <p class="group-text">{stats.thoughts.join('、')}</p>
           </div>
         </>
       )}

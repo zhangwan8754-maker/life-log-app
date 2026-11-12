@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'preact/hooks'
 import { ymd } from '../lib/dates'
 import { useAutoGrow, useFile } from '../lib/hooks'
+import * as A from '../lib/actions'
 import { parseMe, type MeField } from '../lib/me'
+import { TARGET_SUB } from '../lib/targets'
 import { store } from '../lib/store'
 import { cx, markdown } from '../lib/ui'
 import { Page } from '../components/Page'
@@ -34,7 +36,9 @@ export function MePage() {
         </a>
       }
     >
-      {me.groups.map((g) => (
+      {me.groups.map((g) => {
+        const edit = (f: MeField) => (f.sub === TARGET_SUB ? A.targetSheet.set(true) : setEditing(f))
+        return (
         <>
           <p class="group-label me-label">
             {g.title}
@@ -47,11 +51,11 @@ export function MePage() {
                 role="button"
                 tabIndex={0}
                 aria-label={`编辑 ${g.title}${f.sub ? ` · ${f.sub}` : ''}`}
-                onClick={() => setEditing(f)}
+                onClick={() => edit(f)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    setEditing(f)
+                    edit(f)
                   }
                 }}
               >
@@ -61,7 +65,8 @@ export function MePage() {
             ))}
           </div>
         </>
-      ))}
+        )
+      })}
       {me.extras.length > 0 && (
         <>
           <p class="group-label me-label">

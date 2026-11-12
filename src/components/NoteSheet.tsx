@@ -2,11 +2,11 @@ import { useEffect, useState } from 'preact/hooks'
 import * as A from '../lib/actions'
 import { cnMonthDay, weekday } from '../lib/dates'
 import { KIND_LABEL, noteKind, type Note } from '../lib/md'
-import { go, useBox } from '../lib/ui'
+import { useBox } from '../lib/ui'
 import { Icon } from './Icon'
 import { Sheet } from './Sheet'
 
-/** 一条速记：点开可以编辑、删除、提炼。「投入 / 学到 / 问题」开头的显示成小标签 */
+/** 一条速记：点开可以编辑、删除。「投入 / 学到 / 问题」开头的显示成小标签 */
 export function NoteRow({ date, note }: { date: string; note: Note }) {
   const k = noteKind(note.text)
   return (
@@ -61,23 +61,9 @@ export function NoteSheet() {
               <Icon name="trash" size={18} />
               删除
             </button>
-            <span class="btn-pair">
-              <button
-                type="button"
-                class="text-btn"
-                onClick={() => {
-                  const cur = commit()!
-                  A.noteSheet.set(null)
-                  A.setDraft({ body: cur.text, from: cur.date })
-                  go('#/thought/new')
-                }}
-              >
-                提炼为思想
-              </button>
-              <button type="button" class="text-btn strong" onClick={close}>
-                完成
-              </button>
-            </span>
+            <button type="button" class="text-btn strong" onClick={close}>
+              完成
+            </button>
           </div>
         </div>
       )}

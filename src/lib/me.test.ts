@@ -36,13 +36,13 @@ describe('空骨架', () => {
   it('五栏十项，文件里没有说明文字', () => {
     const md = emptyMe()
     expect(md).toBe(
-      '---\nupdated:\n---\n# 我是谁\n\n## 现在\n\n## 在乎\n\n### 让我有劲的\n\n### 耗我的\n\n### 好的一天\n\n## 方向\n\n### 这学期\n\n### 毕业时\n\n### 更远\n\n## 做法\n\n### 验证过的\n\n### 借来的\n\n## 还没想清楚\n',
+      '---\nupdated:\n---\n# 我是谁\n\n## 现在\n\n## 在乎\n\n### 让我有劲的\n\n### 耗我的\n\n### 好的一天\n\n## 方向\n\n### 这学期\n\n### 每周投入\n\n### 毕业时\n\n### 更远\n\n## 做法\n\n### 验证过的\n\n### 借来的\n\n## 还没想清楚\n',
     )
     const me = parseMe(md)
     expect(me.groups.map((g) => [g.title, g.fields.map((f) => f.sub)])).toEqual([
       ['现在', ['']],
       ['在乎', ['让我有劲的', '耗我的', '好的一天']],
-      ['方向', ['这学期', '毕业时', '更远']],
+      ['方向', ['这学期', '每周投入', '毕业时', '更远']],
       ['做法', ['验证过的', '借来的']],
       ['还没想清楚', ['']],
     ])
@@ -57,7 +57,7 @@ describe('只改一栏', () => {
     md = setMeField(md, '做法', '借来的', '「成长性思维+承担责任」(11-07)', '2026-11-10')
     md = setMeField(md, '方向', '这学期', '- 过四级\n- 做完一个 ops 小项目', '2026-11-11')
     expect(md).toContain('---\nupdated: 2026-11-11\n---\n# 我是谁\n\n## 现在\n\n在读学生\n正在学 ops\n\n## 在乎\n')
-    expect(md).toContain('## 方向\n\n### 这学期\n\n- 过四级\n- 做完一个 ops 小项目\n\n### 毕业时\n')
+    expect(md).toContain('## 方向\n\n### 这学期\n\n- 过四级\n- 做完一个 ops 小项目\n\n### 每周投入\n\n### 毕业时\n')
     expect(md).toContain('### 验证过的\n\n### 借来的\n\n「成长性思维+承担责任」(11-07)\n\n## 还没想清楚\n')
     expect(parseMe(md).filled).toBe(3)
 

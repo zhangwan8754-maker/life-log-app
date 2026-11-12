@@ -101,7 +101,7 @@ function label(op: Op): string {
 
 export type Status = 'idle' | 'syncing' | 'offline' | 'error'
 
-const TRACKED = (p: string) => p === 'me.md' || p === 'todo.md' || /^(days|thoughts|reviews|memory)\/.+\.md$/.test(p)
+const TRACKED = (p: string) => p === 'me.md' || p === 'todo.md' || /^(days|reviews|memory)\/.+\.md$/.test(p)
 const CFG_KEY = 'll.config'
 const STATE_KEY = 'll.state'
 

@@ -1,4 +1,3 @@
-import { setDraft } from '../lib/actions'
 import { ymd } from '../lib/dates'
 import { useStore, useTree } from '../lib/hooks'
 import { advisors, PROPOSALS_DIR, type Advisor, type Proposal } from '../lib/memory'
@@ -6,13 +5,6 @@ import { store } from '../lib/store'
 import { go, markdown, toast } from '../lib/ui'
 import { Tabs } from '../components/Controls'
 import { Empty, Page } from '../components/Page'
-
-/** 建议里引的那句原话和它的出处日期，用来直接起草一张思想卡片 */
-function quoteOf(p: Proposal): { body: string; from: string } | null {
-  const body = p.text.match(/「([^」]{4,})」/)?.[1]
-  if (!body) return null
-  return { body, from: p.text.match(/days\/\d{4}\/(\d{4}-\d{2}-\d{2})\.md/)?.[1] ?? '' }
-}
 
 export const useAdvisors = (): Advisor[] => {
   const s = useStore()
@@ -22,7 +14,7 @@ export const useAdvisors = (): Advisor[] => {
 
 /**
  * AI 的建议：每个 AI（Claude、DeepSeek……）一栏，各看各的，互不覆盖。
- * AI 想让我改「我的声音」（我是谁、思想、待办）时排在这里，它不会自己动；做完或不采纳，都划掉。
+ * AI 想让我改「我的声音」（我是谁、待办）时排在这里，它不会自己动；做完或不采纳，都划掉。
  */
 export function AdvicePage({ agent }: { agent?: string }) {
   const s = useStore()
@@ -60,26 +52,12 @@ export function AdvicePage({ agent }: { agent?: string }) {
           <div class="group">
             {items
               .filter((p) => p.section === sec)
-              .map((p) => {
-                const q = /思想/.test(sec) ? quoteOf(p) : null
-                return (
+              .map((p) => (
                   <div class="proposal">
                     <span class="proposal-n">{p.n}</span>
                     <div class="proposal-main">
                       <div class="prose" dangerouslySetInnerHTML={{ __html: markdown(p.text) }} />
                       <div class="proposal-actions">
-                        {q && (
-                          <button
-                            type="button"
-                            class="text-btn small"
-                            onClick={() => {
-                              setDraft(q)
-                              go('#/thought/new')
-                            }}
-                          >
-                            写成思想
-                          </button>
-                        )}
                         {/我是谁|me\.md/.test(sec) && (
                           <a class="text-btn small" href="#/me">
                             去「我是谁」
@@ -91,8 +69,7 @@ export function AdvicePage({ agent }: { agent?: string }) {
                       </div>
                     </div>
                   </div>
-                )
-              })}
+              ))}
           </div>
         </>
       ))}

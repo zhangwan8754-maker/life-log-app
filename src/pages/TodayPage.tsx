@@ -3,15 +3,17 @@ import * as A from '../lib/actions'
 import { recent, visible } from '../lib/actions'
 import { addDays, cnMonthDay, dayPath, isYmd, parseYmd, weekday, ymd } from '../lib/dates'
 import { dayMd, useFile, useToday, useTodo, useTree } from '../lib/hooks'
-import { daySpent, fmtHours, getMeta, getSection, noteKind, parseNotes, score } from '../lib/md'
+import { daySpent, fmtHours, getMeta, getSection, noteKind, parseNotes, score, sumSpent } from '../lib/md'
+import { weekOf } from '../lib/review'
 import { store } from '../lib/store'
+import { meTargets, targetProgress } from '../lib/targets'
 import { allTasks } from '../lib/todo'
 import { cx, go, useBox } from '../lib/ui'
 import { type Metric, METRIC_NAME } from '../components/Charts'
 import { Icon } from '../components/Icon'
 import { Page } from '../components/Page'
 import { Sheet } from '../components/Sheet'
-import { spentTotal } from '../components/Spent'
+import { spentTotal, TimerCard } from '../components/Spent'
 import { TaskRow } from '../components/TaskRow'
 import { NoteRow } from '../components/NoteSheet'
 
@@ -56,6 +58,9 @@ export function TodayPage({ date }: { date?: string }) {
   const energy = score(getMeta(md, 'energy'))
   const past = d < today
   const openSpent = () => A.spentSheet.set({ date: d })
+  // 本周目标：只在「今天」显示，一行，点开去「数据」
+  const me = useFile(isToday ? 'me.md' : null)
+  const targets = isToday ? targetProgress(meTargets(me), sumSpent(weekOf(d).days.map((x) => daySpent(dayMd(x) ?? '')))).items : []
 
   const prev = addDays(d, -1)
   const next = addDays(d, 1)
@@ -84,6 +89,7 @@ export function TodayPage({ date }: { date?: string }) {
 
   return (
     <Page title={isToday ? '今天' : cnMonthDay(d)} icon={isToday ? 'today' : 'calendar'} subtitle={subtitle} class="today">
+      {isToday && <TimerCard />}
       {due.length > 0 && (
         <div class="group">
           <div class="tasks">
@@ -140,6 +146,12 @@ export function TodayPage({ date }: { date?: string }) {
               <span class="spent-line-total">投入 {fmtHours(spentTotal(spent))}</span>
               <span class="spent-line-items">{spent.map((x) => `${x.name} ${fmtHours(x.hours)}`).join(' · ')}</span>
             </button>
+          )}
+          {targets.length > 0 && (
+            <a class="spent-line target-line" href="#/stats" aria-label="本周目标的进度">
+              <span class="spent-line-total">本周</span>
+              <span class="spent-line-items">{targets.map((x) => `${x.name} ${fmtHours(x.done)}/${fmtHours(x.hours)}`).join(' · ')}</span>
+            </a>
           )}
           {isToday && (
             <form

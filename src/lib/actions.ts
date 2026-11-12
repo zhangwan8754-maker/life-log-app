@@ -1,5 +1,6 @@
 /** 任务相关的用户动作 + 全局弹层状态 */
 import { dayPath, hm, ymd } from './dates'
+import { fmtMinutes } from './md'
 import { store } from './store'
 import { INBOX, type Task } from './todo'
 import { Box, haptic, toast } from './ui'
@@ -98,14 +99,101 @@ export function addNote(date: string, text: string) {
 /** 「记一笔投入」弹层：记到哪一天 */
 export const spentSheet = new Box<{ date: string } | null>(null)
 
-// ───── 提炼为思想：把速记带进新建思想页 ─────
+/** 「每周目标」弹层 */
+export const targetSheet = new Box(false)
 
-let draft: { body: string; from: string } | null = null
-export const setDraft = (d: typeof draft) => {
-  draft = d
+// ───── 计时：开始 → 结束，自动记成一笔投入 ─────
+// 只存在这台设备上（localStorage）；关掉页面也在走，因为记的是开始的时刻。
+
+export interface Timer {
+  name: string
+  /** 开始的时刻，毫秒 */
+  start: number
+  /** 已经暂停掉的时间，毫秒 */
+  gap?: number
+  /** 正在暂停：从哪一刻开始停的 */
+  paused?: number
 }
-export const takeDraft = () => {
-  const d = draft
-  draft = null
-  return d
+const TIMER_KEY = 'll.timer'
+/** 超过这么久，多半是忘了结束：先问实际学了多久，不直接记 */
+export const LONG_TIMER_MIN = 240
+
+function loadTimer(): Timer | null {
+  try {
+    const t = JSON.parse(localStorage.getItem(TIMER_KEY) ?? 'null')
+    if (!t || typeof t.name !== 'string' || typeof t.start !== 'number') return null
+    return { name: t.name, start: t.start, gap: typeof t.gap === 'number' ? t.gap : 0, ...(typeof t.paused === 'number' ? { paused: t.paused } : {}) }
+  } catch {
+    return null
+  }
+}
+export const timer = new Box<Timer | null>(loadTimer())
+/** 计时太久时弹出来确认的那一次 */
+export const timerStop = new Box<Timer | null>(null)
+
+function setTimer(t: Timer | null) {
+  timer.set(t)
+  try {
+    if (t) localStorage.setItem(TIMER_KEY, JSON.stringify(t))
+    else localStorage.removeItem(TIMER_KEY)
+  } catch {}
+}
+// 另一个标签页里开始或结束了计时
+if (typeof addEventListener === 'function')
+  addEventListener('storage', (e) => {
+    if (e.key === TIMER_KEY) timer.set(loadTimer())
+  })
+
+/** 真正在学的时间（不算暂停），毫秒 */
+export const timerElapsed = (t: Timer, now = Date.now()) => Math.max(0, (t.paused ?? now) - t.start - (t.gap ?? 0))
+export const timerMinutes = (t: Timer, now = Date.now()) => Math.round(timerElapsed(t, now) / 60000)
+/** 47 → 47 分钟，125 → 2 小时 5 分 */
+export const minutesLabel = (min: number) => (min < 60 ? `${min} 分钟` : `${Math.floor(min / 60)} 小时${min % 60 ? ` ${min % 60} 分` : ''}`)
+
+export function startTimer(name: string) {
+  setTimer({ name, start: Date.now(), gap: 0 })
+  haptic(10)
+}
+
+/** 暂停 / 继续：休息的时间不算进投入 */
+export function toggleTimerPause() {
+  const t = timer.value
+  if (!t) return
+  const now = Date.now()
+  if (t.paused) setTimer({ name: t.name, start: t.start, gap: (t.gap ?? 0) + (now - t.paused) })
+  else setTimer({ ...t, paused: now })
+  haptic(8)
+}
+
+/** 结束计时，记成今天的一笔投入；撤销会删掉这一笔并接着计时 */
+export function logTimer(t: Timer, min: number) {
+  setTimer(null)
+  if (min < 1) return toast('不到 1 分钟，没有记下', { label: '继续计时', run: () => setTimer(t) })
+  const date = ymd()
+  const time = hm()
+  const text = `投入：${t.name} ${fmtMinutes(min)}`
+  store.enqueue(dayPath(date), { kind: 'note', date, time, text })
+  haptic(10)
+  toast(`已记下 ${t.name} ${minutesLabel(min)}`, {
+    label: '撤销',
+    run: () => {
+      store.enqueue(dayPath(date), { kind: 'note.delete', date, time, text })
+      setTimer(t)
+    },
+  })
+}
+
+export function stopTimer() {
+  const t = timer.value
+  if (!t) return
+  const min = timerMinutes(t)
+  if (min >= LONG_TIMER_MIN) timerStop.set(t)
+  else logTimer(t, min)
+}
+
+export function discardTimer() {
+  const t = timer.value
+  if (!t) return
+  setTimer(null)
+  toast('已放弃这次计时', { label: '撤销', run: () => setTimer(t) })
 }

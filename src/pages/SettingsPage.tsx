@@ -28,7 +28,7 @@ export function SettingsPage() {
       {!c && (
         <div class="welcome">
           <BrandMark size={44} />
-          <p>计划、日记、思想，都以 Markdown 存在你自己的 GitHub 仓库里。手机电脑互通，AI 随时可读。</p>
+          <p>计划、日记、复盘，都以 Markdown 存在你自己的 GitHub 仓库里。手机电脑互通，AI 随时可读。</p>
         </div>
       )}
       <form

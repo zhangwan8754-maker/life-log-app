@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { addDays, cnMonthDay, parseYmd, shortWeekday, weekday, ymd } from '../lib/dates'
 import { useStore, useToday, useTree } from '../lib/hooks'
-import { daySpent, fmtHours, getMeta, getSection, noteKind, parseNotes, score, stripFrontmatter, thoughtBody, type NoteKind } from '../lib/md'
+import { daySpent, fmtHours, getMeta, getSection, noteKind, parseNotes, score, type NoteKind } from '../lib/md'
 import { parsePatterns, PATTERNS, STATUSES, TIMELINE, type Pattern } from '../lib/memory'
 import { store } from '../lib/store'
 import { cx, go, markdown } from '../lib/ui'
@@ -11,34 +11,27 @@ import { Empty, Page } from '../components/Page'
 import { NoteRow } from '../components/NoteSheet'
 import { Sheet } from '../components/Sheet'
 import { spentTotal } from '../components/Spent'
-import { tagsOf, titleOf } from './ThoughtPage'
 
-export type MemorySeg = 'timeline' | 'notes' | 'thoughts' | 'patterns'
+export type MemorySeg = 'timeline' | 'notes' | 'patterns'
 interface DayDoc {
   date: string
   md: string
 }
 
-const excerpt = (md: string) => thoughtBody(md).replace(/^[\s>#*-]+/gm, '').replace(/[*_`[\]]/g, '').replace(/\s+/g, ' ').slice(0, 80)
 const journalOf = (md: string) => (getSection(md, '日记') ?? '').replace(/\s+/g, ' ').trim()
 
 /**
  * 记忆：想得起。
  *   时间线 —— 过去的每一天，以及「那时的今天」
  *   速记   —— 所有速记，可以只看「学到」或「问题」
- *   思想   —— 沉淀下来的卡片
  *   模式   —— AI 记下的假设，由我裁决
- * 顶上的搜索同时找思想、速记和日记。
+ * 顶上的搜索同时找速记和日记。
  */
 export function MemoryPage({ seg }: { seg: MemorySeg }) {
   const s = useStore()
-  const loaded = useTree('days/', 'thoughts/', 'memory/')
+  const loaded = useTree('days/', 'memory/')
   const [q, setQ] = useState('')
 
-  const thoughts = s
-    .list('thoughts/')
-    .map((p) => ({ p, md: s.read(p) ?? '' }))
-    .sort((a, b) => (getMeta(b.md, 'created') || '').localeCompare(getMeta(a.md, 'created') || ''))
   const days: DayDoc[] = s
     .list('days/')
     .map((p) => ({ date: p.match(/(\d{4}-\d{2}-\d{2})\.md$/)?.[1] ?? '', md: s.read(p) ?? '' }))
@@ -47,21 +40,13 @@ export function MemoryPage({ seg }: { seg: MemorySeg }) {
   const patterns = parsePatterns(s.read(PATTERNS))
 
   return (
-    <Page
-      title="记忆"
-      icon="memory"
-      actions={
-        <a class="icon-btn" href="#/thought/new" aria-label="新建思想">
-          <Icon name="edit" size={21} />
-        </a>
-      }
-    >
+    <Page title="记忆" icon="memory">
       <label class="search">
         <Icon name="search" size={19} />
-        <input type="search" value={q} placeholder="搜索思想、速记、日记" onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+        <input type="search" value={q} placeholder="搜索速记、日记" onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
       </label>
       {q.trim() ? (
-        <Results q={q.trim()} thoughts={thoughts} days={days} />
+        <Results q={q.trim()} days={days} />
       ) : (
         <>
           <div class="notes-tabs">
@@ -70,7 +55,6 @@ export function MemoryPage({ seg }: { seg: MemorySeg }) {
               options={[
                 { value: 'timeline', label: '时间线' },
                 { value: 'notes', label: '速记' },
-                { value: 'thoughts', label: '思想' },
                 { value: 'patterns', label: '模式' },
               ]}
               onChange={(v) => go(v === 'timeline' ? '#/memory' : `#/memory/${v}`)}
@@ -78,7 +62,6 @@ export function MemoryPage({ seg }: { seg: MemorySeg }) {
           </div>
           {seg === 'timeline' && <Timeline days={days} loaded={loaded} hasAiTimeline={!!s.read(TIMELINE)} />}
           {seg === 'notes' && <NoteStream days={days} />}
-          {seg === 'thoughts' && <Thoughts thoughts={thoughts} loaded={loaded} />}
           {seg === 'patterns' && <Patterns patterns={patterns} loaded={loaded} />}
         </>
       )}
@@ -240,45 +223,6 @@ const More = ({ left, onClick }: { left: number; onClick: () => void }) => (
   </div>
 )
 
-// ───── 思想 ─────
-
-function Thoughts({ thoughts, loaded }: { thoughts: { p: string; md: string }[]; loaded: boolean }) {
-  const [tag, setTag] = useState('')
-  const allTags = [...new Set(thoughts.flatMap((t) => tagsOf(t.md)))]
-  const shown = thoughts.filter((t) => !tag || tagsOf(t.md).includes(tag))
-  return (
-    <>
-      {allTags.length > 0 && (
-        <div class="chips scroll">
-          <Chip on={!tag} onClick={() => setTag('')}>
-            全部
-          </Chip>
-          {allTags.map((t) => (
-            <Chip on={tag === t} onClick={() => setTag(tag === t ? '' : t)}>
-              #{t}
-            </Chip>
-          ))}
-        </div>
-      )}
-      <div class="group">
-        {shown.map(({ p, md }) => (
-          <a class="row thought-row" href={`#/thought/${encodeURIComponent(p)}`}>
-            <span class="thought-title">{titleOf(p, md)}</span>
-            <span class="thought-excerpt">{excerpt(md)}</span>
-            <span class="thought-meta">
-              {getMeta(md, 'created')}
-              {tagsOf(md).map((t) => (
-                <span class="tag">#{t}</span>
-              ))}
-            </span>
-          </a>
-        ))}
-        {loaded && !shown.length && <Empty icon="notes">还没有思想。点开一条速记，选「提炼为思想」，把一闪而过的念头写成完整的想法。</Empty>}
-      </div>
-    </>
-  )
-}
-
 // ───── 模式 ─────
 
 const STATUS_CLASS: Record<string, string> = { 观察中: 'watching', 成立: 'holds', 推翻: 'rejected' }
@@ -351,7 +295,7 @@ function PatternSheet({ pattern, onClose }: { pattern: Pattern | null; onClose: 
 
 // ───── 搜索 ─────
 
-function Results({ q, thoughts, days }: { q: string; thoughts: { p: string; md: string }[]; days: DayDoc[] }) {
+function Results({ q, days }: { q: string; days: DayDoc[] }) {
   const kw = q.toLowerCase()
   const snip = (text: string) => {
     const i = text.toLowerCase().indexOf(kw)
@@ -363,10 +307,6 @@ function Results({ q, thoughts, days }: { q: string; thoughts: { p: string; md: 
     return i < 0 ? t : [t.slice(0, i), <mark>{t.slice(i, i + kw.length)}</mark>, t.slice(i + kw.length)]
   }
   const hits: { href: string; kind: string; title: string; snip: string }[] = []
-  for (const { p, md } of thoughts) {
-    const sn = snip(`${titleOf(p, md)} ${stripFrontmatter(md)}`)
-    if (sn) hits.push({ href: `#/thought/${encodeURIComponent(p)}`, kind: '思想', title: titleOf(p, md), snip: sn })
-  }
   for (const d of days) {
     for (const n of parseNotes(d.md)) {
       const sn = snip(n.text)
@@ -380,7 +320,7 @@ function Results({ q, thoughts, days }: { q: string; thoughts: { p: string; md: 
       {hits.slice(0, 50).map((h) => (
         <a class="row result" href={h.href}>
           <span class="result-top">
-            <span class={cx('result-kind', h.kind === '思想' && 'accent')}>{h.kind}</span>
+            <span class="result-kind">{h.kind}</span>
             <span class="result-title">{h.title}</span>
           </span>
           <span class="result-snip">{mark(h.snip)}</span>
