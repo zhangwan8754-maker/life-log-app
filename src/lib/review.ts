@@ -211,7 +211,8 @@ function timelineText(md: string | null | undefined): string {
   const ls = plain(stripFrontmatter(md ?? ''))
     .split('\n')
     .filter((l) => l.trim() && !/^\s*>/.test(l) && !/^# /.test(l))
-  return ls.slice(-60).join('\n')
+  // 里面的小标题不和上下文的标题撞层级
+  return ls.slice(-60).map((l) => l.replace(/^#+\s+(.*)$/, '【$1】')).join('\n')
 }
 
 /**

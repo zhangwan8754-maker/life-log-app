@@ -130,7 +130,7 @@ describe('投入、下一步、叫法', () => {
     const p = aiPrompt(r, me, md, todo, s, {
       today: '2026-11-12',
       prev: weekStats(weekOf('2026-11-03'), md, todo, '2026-11-12', me),
-      timeline: '---\nthrough: 2026-11-11\n---\n# 大事记\n\n> 说明文字\n\n- [11-08](../days/2026/2026-11-08.md)（9 / 8）进博会\n',
+      timeline: '---\nthrough: 2026-11-11\n---\n# 大事记\n\n> 说明文字\n\n## 2026\n\n- [11-08](../days/2026/2026-11-08.md)（9 / 8）进博会\n',
       pending: [{ name: 'Claude', n: 6, text: '「还没想清楚」← 数学到底要不要每天学？见 [模式账本 P3](../patterns.md)\n续行不要' }],
     })
     expect(p).toContain('今天是 2026-11-12（周四），这一周还没过完')
@@ -139,7 +139,7 @@ describe('投入、下一步、叫法', () => {
     expect(p).toContain('- 数学：2.5h，2 天\n- 英语语法：1h，1 天\n- 合计 3.5h；过去的 4 天里有 2 天记了投入')
     expect(p).toContain('- 数学：2.5h / 10h（25%）\n- 英语：1h / 14h（7%）')
     expect(p).toContain('### 和上周比（上周 → 这周，这周还没过完）\n\n- 记录天数：1 → 3\n- 情绪均值：6.0 → 5.5\n- 精力均值：7.0 → 6.5\n- 投入：1h → 3.5h')
-    expect(p).toContain('## 大事记（更早发生过什么，只有事实）\n- 11-08（9 / 8）进博会\n')
+    expect(p).toContain('## 大事记（更早发生过什么，只有事实）\n【2026】\n- 11-08（9 / 8）进博会\n')
     expect(p).toContain('- Claude 第 6 条：「还没想清楚」← 数学到底要不要每天学？见 模式账本 P3\n')
     expect(p).not.toContain('续行不要')
     expect(p).toContain('### 下一步\n最多 3 条，每条一行')
