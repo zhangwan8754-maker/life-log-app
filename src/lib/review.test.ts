@@ -25,10 +25,10 @@ describe('周', () => {
 
 describe('统计与复盘文件', () => {
   const r = weekOf('2026-11-05')
-  const s = weekStats(r, (d) => days[d], todo, [{ title: '慢即是快', created: '2026-11-03' }, { title: '旧', created: '2026-10-01' }], '2026-11-05')
+  const s = weekStats(r, (d) => days[d], todo, '2026-11-05')
 
   it('统计', () => {
-    expect(s).toMatchObject({ daysLogged: 2, moodAvg: '7.0', energyAvg: '5.0', notes: 3, open: 2, thoughts: ['慢即是快'] })
+    expect(s).toMatchObject({ daysLogged: 2, moodAvg: '7.0', energyAvg: '5.0', notes: 3, open: 2 })
     expect(s.completed.map((t) => t.text)).toEqual(['本周完成'])
     expect(s.overdue.map((t) => t.text)).toEqual(['逾期的'])
     expect(s.mood).toEqual([6, null, 8, null, null, null, null])
@@ -64,7 +64,7 @@ describe('投入、下一步、叫法', () => {
       '2026-11-02': day('2026-11-02', 6, 5, ['投入：英语 1h，写代码 30min', '学到：先写清楚再动手']),
       '2026-11-04': day('2026-11-04', 8, '', ['投入：写代码 2h', '问题：要不要换到早上跑步', '普通的一条']),
     }
-    const s = weekStats(r, (d) => ds[d], todo, [], '2026-11-05')
+    const s = weekStats(r, (d) => ds[d], todo, '2026-11-05')
     expect(s.spent).toEqual([
       { name: '写代码', hours: 2.5 },
       { name: '英语', hours: 1 },
@@ -88,7 +88,7 @@ describe('投入、下一步、叫法', () => {
   it('AI 提示词带上上周的下一步和模式账本', async () => {
     const { aiPrompt, weekOf, weekStats } = await import('./review')
     const r = weekOf('2026-11-05')
-    const s = weekStats(r, (d) => days[d], todo, [], '2026-11-05')
+    const s = weekStats(r, (d) => days[d], todo, '2026-11-05')
     const p = aiPrompt(r, '', (d) => days[d], todo, s, {
       prevNext: ['早睡'],
       patterns: [{ heading: 'P1 x', id: 'P1', title: '睡够的日子精力更好', status: '观察中', note: '', body: '' }],

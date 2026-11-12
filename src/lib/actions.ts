@@ -98,14 +98,3 @@ export function addNote(date: string, text: string) {
 /** 「记一笔投入」弹层：记到哪一天 */
 export const spentSheet = new Box<{ date: string } | null>(null)
 
-// ───── 提炼为思想：把速记带进新建思想页 ─────
-
-let draft: { body: string; from: string } | null = null
-export const setDraft = (d: typeof draft) => {
-  draft = d
-}
-export const takeDraft = () => {
-  const d = draft
-  draft = null
-  return d
-}

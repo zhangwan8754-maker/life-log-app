@@ -841,10 +841,6 @@
   margin-top: 3px;
   color: var(--text-3);
 }
-.btn-pair {
-  display: inline-flex;
-  gap: 18px;
-}
 .notes time {
   flex: none;
   width: 3em;
@@ -1305,38 +1301,8 @@
 .chips.scroll .chip.on {
   background: var(--accent-soft);
 }
-.row.thought-row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 3px;
-  min-height: 0;
-  padding: 14px 16px;
-}
-.group .row.thought-row + .row.thought-row::before,
 .group .row.result + .row.result::before {
   left: 16px;
-}
-.thought-title {
-  font-size: 18px;
-  font-weight: 600;
-}
-.thought-excerpt {
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--text-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.thought-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 10px;
-  font-size: 13px;
-  color: var(--text-3);
-}
-.tag {
-  color: var(--accent);
 }
 .notes.in-group {
   padding: 2px 16px;
@@ -1359,10 +1325,6 @@
   font-size: 12px;
   color: var(--text-2);
 }
-.result-kind.accent {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
 .result-title {
   font-size: 14px;
   color: var(--text-3);
@@ -1376,58 +1338,6 @@ mark {
   color: inherit;
   border-radius: 3px;
   padding: 0 1px;
-}
-
-/* 思想：阅读 / 编辑 */
-.reader,
-.editor {
-  background: var(--group);
-  border-radius: var(--r-group);
-  padding: 18px 18px 22px;
-}
-.reader-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin-bottom: 14px;
-  font-size: 14px;
-  color: var(--text-3);
-}
-.reader-meta a {
-  color: var(--accent);
-}
-.editor {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.title-input,
-.body-input,
-.tags-input {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  outline: none;
-  padding: 0;
-}
-.title-input {
-  margin-bottom: 10px;
-  font-size: 22px;
-  font-weight: 600;
-}
-.body-input {
-  min-height: 40dvh;
-  resize: none;
-  overflow: hidden;
-  font-size: 18px;
-  line-height: 1.8;
-}
-.tags-input {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  font-size: 15px;
-  color: var(--text-2);
 }
 
 /* 富文本 */

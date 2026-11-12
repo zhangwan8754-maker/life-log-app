@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { isoWeek } from './dates'
 import {
   appendNote, deleteNote, editNote, getMeta, getSection, newDay, restoreNote,
-  newThought, parseNotes, setMeta, setSection, setThoughtBody, thoughtBody,
+  parseNotes, setMeta, setSection,
 } from './md'
 
 describe('frontmatter', () => {
@@ -65,17 +65,6 @@ describe('速记：编辑 / 删除 / 撤销', () => {
   it('没有时间的速记（手写的）也能删', () => {
     const md = '## 速记\n\n- 手写的一条\n- 09:00 另一条\n'
     expect(texts(deleteNote(md, '', '手写的一条'))).toEqual(['09:00 另一条'])
-  })
-})
-
-describe('思想', () => {
-  it('正文读写保留 frontmatter', () => {
-    let md = newThought('标题', '第一版', '2026-11-05', '2026-11-04')
-    expect(thoughtBody(md)).toBe('第一版')
-    md = setThoughtBody(md, '新标题', '第二版')
-    expect(getMeta(md, 'from')).toBe('2026-11-04')
-    expect(md).toContain('# 新标题')
-    expect(thoughtBody(md)).toBe('第二版')
   })
 })
 

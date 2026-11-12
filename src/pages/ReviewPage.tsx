@@ -13,13 +13,6 @@ import { Icon } from '../components/Icon'
 import { Empty, Page } from '../components/Page'
 import { SpentBars } from '../components/Spent'
 import { useAdvisors } from './AdvicePage'
-import { titleOf } from './ThoughtPage'
-
-export const thoughtIndex = () =>
-  store.list('thoughts/').map((p) => {
-    const md = store.read(p) ?? ''
-    return { title: titleOf(p, md), created: getMeta(md, 'created') }
-  })
 
 /** 一行四个数字 */
 export function Stats({ s }: { s: WeekStats }) {
@@ -54,14 +47,14 @@ const reviewFiles = () =>
 export function ReviewPage() {
   const s = useStore()
   const today = useToday()
-  useTree('days/', 'thoughts/', 'reviews/', 'memory/')
+  useTree('days/', 'reviews/', 'memory/')
   const todo = useFile('todo.md') ?? ''
   const me = useFile('me.md') ?? ''
   const meDoc = parseMe(me)
   const all = useAdvisors()
 
   const r = weekOf(today)
-  const stats = weekStats(r, dayMd, todo, thoughtIndex(), today)
+  const stats = weekStats(r, dayMd, todo, today)
   const done = s.read(reviewPath(r))
   const prev = prevWeek(r)
   const prevMissing = s.treeLoaded && today <= addDays(r.from, 1) && !s.read(reviewPath(prev))
@@ -127,13 +120,13 @@ export function ReviewPage() {
 /** 数据：本周数字、投入、近 30 天趋势、年度热力图 */
 export function StatsPage() {
   const today = useToday()
-  useTree('days/', 'thoughts/')
+  useTree('days/')
   const todo = useFile('todo.md') ?? ''
   const [metric, setMetric] = useState<Metric>('mood')
   const [year, setYear] = useState(Number(today.slice(0, 4)))
 
   const r = weekOf(today)
-  const stats = weekStats(r, dayMd, todo, thoughtIndex(), today)
+  const stats = weekStats(r, dayMd, todo, today)
   const last30 = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29))
   const series = (k: Metric) => last30.map((d) => score(getMeta(dayMd(d) ?? '', k)))
   const hasTrend = series('mood').some((v) => v !== null) || series('energy').some((v) => v !== null)

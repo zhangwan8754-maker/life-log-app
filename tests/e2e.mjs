@@ -42,7 +42,7 @@ function seedMemory(gh) {
   gh.write(DEEPSEEK, `---\nagent: deepseek\nupdated: ${plusDays(-1)}\n---\n# DeepSeek 的建议\n\n## ${PREV_WEEK} 复盘\n\n1. 这周有三天是十二点后睡的，先把睡觉时间固定下来。\n2. 「读书计划」两周没有勾过任务，目标还成立吗？\n`)
   gh.write(
     CLAUDE,
-    `---\nagent: claude\nupdated: ${plusDays(-3)}\n---\n# 提议\n\n> AI 写，主人决定。\n\n## 可以写成思想卡片的原话\n\n1. ${link(-1)}「把问题写清楚，就解决了一半。」（周末整理笔记时）\n\n## 可以放进 me.md 的\n\n4. 「做法 · 借来的」←「重要的事放在上午做」。这是你读到的，还没试过。\n\n## 待办和复盘\n\n7. 「健身」项目的任务是每周都要做的事，永远勾不掉。可以二选一：\n   - 改成有终点的任务；\n   - 或者每次记一条投入。\n`,
+    `---\nagent: claude\nupdated: ${plusDays(-3)}\n---\n# 提议\n\n> AI 写，主人决定。\n\n## 值得再看一眼的原话\n\n1. ${link(-1)}「把问题写清楚，就解决了一半。」（周末整理笔记时）\n\n## 可以放进 me.md 的\n\n4. 「做法 · 借来的」←「重要的事放在上午做」。这是你读到的，还没试过。\n\n## 待办和复盘\n\n7. 「健身」项目的任务是每周都要做的事，永远勾不掉。可以二选一：\n   - 改成有终点的任务；\n   - 或者每次记一条投入。\n`,
   )
   gh.write('memory/timeline.md', `---\nthrough: ${plusDays(-1)}\n---\n# 大事记\n\n- ${link(-4)} 爬了一天山，「腿很酸，但很痛快。」\n`)
 }
@@ -136,8 +136,6 @@ function seedSample(gh) {
     'todo.md',
     `# 待办\n\n## 收件箱\n\n- [ ] 给妈妈打电话 @${TODAY}\n- [ ] 整理上个月的照片 @${plusDays(-2)}\n- [ ] 换手机壳\n- [ ] 查一下护照有效期\n- [x] 交房租 @${TODAY} ✓${TODAY}\n\n## 读书计划\n\n> 今年读完 24 本\n- [ ] 读完《置身事内》第 3 章 @${TODAY} #阅读\n- [ ] 写《置身事内》读书笔记 @${plusDays(3)}\n- [ ] 选下一本书\n- [x] 读完《人类简史》 ✓${plusDays(-6)}\n- [x] 读完《原则》 ✓${plusDays(-20)}\n\n## 健身\n\n> 每周 3 次，体脂降到 18%\n- [ ] 跑步 5 公里 @${TOMORROW}\n- [ ] 力量训练 @${plusDays(2)}\n- [x] 办健身卡 ✓${plusDays(-3)}\n\n## 春节旅行\n\n> 带爸妈去一趟云南\n- [ ] 定路线 @${plusDays(8)}\n- [ ] 比价机票\n\n## 将来\n\n- [ ] 学一首钢琴曲\n- [ ] 学做一道新菜\n`,
   )
-  gh.write('thoughts/慢即是快.md', `---\ncreated: ${plusDays(-5)}\ntags: [方法, 节奏]\nfrom: \n---\n# 慢即是快\n\n急着推进时最容易返工。先花十分钟把问题写清楚，往往比直接动手省下一小时。\n`)
-  gh.write('thoughts/能量管理.md', `---\ncreated: ${plusDays(-12)}\ntags: [精力]\nfrom: \n---\n# 能量管理比时间管理更重要\n\n上午的两小时是一天里最清醒的时候，留给最难的事；会议和杂事放到下午。\n`)
 }
 
 // ───── 运行 ─────
@@ -431,23 +429,15 @@ try {
     await page.locator('.task', { hasText: '跑步' }).waitFor()
   })
 
-  await step('从速记提炼为思想', async () => {
+  await step('速记弹层只有删除和完成，没有「提炼为思想」', async () => {
     await tab('今天')
     await dayNotes.locator('.note-row', { hasText: '第一条速记' }).click()
-    await sheet.locator('.text-btn', { hasText: '提炼为思想' }).click()
-    await page.waitForURL(/#\/thought\/new/)
-    assert.equal(await page.inputValue('.body-input'), '第一条速记')
-    await page.fill('.title-input', '记录本身就是思考')
-    await page.fill('.tags-input', '方法 记录')
-    await until(() => gh.read('thoughts/记录本身就是思考.md'), '思想文件')
-    const md = gh.read('thoughts/记录本身就是思考.md')
-    assert.match(md, new RegExp(`created: ${TODAY}\\ntags: \\[方法, 记录\\]\\nfrom: ${TODAY}`))
-    assert.ok(md.includes('# 记录本身就是思考\n\n第一条速记'))
-    await page.locator('.topbar .text-btn', { hasText: '完成' }).click()
-    await page.locator('.prose', { hasText: '第一条速记' }).waitFor()
+    await sheet.locator('.text-btn', { hasText: '完成' }).waitFor()
+    assert.equal(await sheet.locator('.text-btn', { hasText: '思想' }).count(), 0)
+    await sheet.locator('.text-btn', { hasText: '完成' }).click()
   })
 
-  await step('记忆：时间线、按种类看速记、思想、搜索', async () => {
+  await step('记忆：时间线、按种类看速记、搜索；没有「思想」一栏', async () => {
     await tab('记忆')
     await page.locator('.head h1', { hasText: '记忆' }).waitFor()
     const card = page.locator('.day-card', { hasText: '今天重新设计了 Life Log。' })
@@ -464,9 +454,13 @@ try {
     await card.click()
     await page.waitForURL((u) => u.hash === `#/day/${TODAY}`)
     await tab('记忆')
-    await page.locator('.notes-tabs button', { hasText: '思想' }).click()
-    await page.locator('.thought-row', { hasText: '记录本身就是思考' }).waitFor()
-    await page.locator('.thought-row', { hasText: '第一性原理' }).waitFor()
+    await page.locator('.notes-tabs button', { hasText: '模式' }).waitFor()
+    assert.deepEqual(await page.locator('.notes-tabs button').allInnerTexts(), ['时间线', '速记', '模式'])
+    // 旧地址不报错，落回时间线；仓库里旧的 thoughts/ 文件不会被搜出来
+    await page.goto(BASE + '#/memory/thoughts')
+    await card.waitFor()
+    await page.fill('.search input', '第一性原理')
+    await page.locator('.search-results', { hasText: '没有找到' }).waitFor()
     await page.fill('.search input', '地铁')
     await page.locator('.result', { hasText: '地铁里没信号' }).waitFor()
     await page.fill('.search input', '重新设计')
@@ -586,7 +580,7 @@ try {
     await page.locator('.prose a[href^="#/day/"]').waitFor()
   })
 
-  await step('AI 的建议：每个 AI 一栏，各划各的；一键起草思想，可以撤销', async () => {
+  await step('AI 的建议：每个 AI 一栏，各划各的，可以撤销', async () => {
     await tab('复盘')
     const advisor = (name) => page.locator('.advisors .row', { hasText: name })
     await advisor('Claude').locator('.row-detail', { hasText: '3 条' }).waitFor()
@@ -596,12 +590,7 @@ try {
     await page.locator('.proposal').nth(2).waitFor()
     assert.equal(await page.locator('.proposal').count(), 3)
     assert.deepEqual(await page.locator('.notes-tabs button').allInnerTexts(), ['Claude 3', 'DeepSeek 2'])
-    await page.locator('.proposal', { hasText: '就解决了一半' }).locator('.text-btn', { hasText: '写成思想' }).click()
-    await page.waitForURL(/#\/thought\/new/)
-    assert.equal(await page.inputValue('.body-input'), '把问题写清楚，就解决了一半。')
-    await page.fill('.title-input', '写清楚就解决了一半')
-    await until(() => gh.read('thoughts/写清楚就解决了一半.md')?.includes(`from: ${plusDays(-1)}`), '思想带上出处日期')
-    await page.goto(BASE + '#/advice/claude')
+    assert.equal(await page.locator('.proposal .text-btn', { hasText: '写成思想' }).count(), 0)
     await page.locator('.proposal', { hasText: '就解决了一半' }).locator('button[aria-label="划掉第 1 条"]').click()
     await until(() => !gh.read(CLAUDE).includes('就解决了一半'), '划掉')
     assert.ok(gh.read(CLAUDE).includes('4. 「做法 · 借来的」') && gh.read(CLAUDE).includes('   - 或者每次记一条投入。'), '其余建议逐字保留、不重新编号')
@@ -748,7 +737,6 @@ try {
       ['upcoming', '#/upcoming'],
       ['memory', '#/memory'],
       ['memory-notes', '#/memory/notes'],
-      ['memory-thoughts', '#/memory/thoughts'],
       ['memory-patterns', '#/memory/patterns'],
       ['review', '#/review'],
       ['stats', '#/stats'],

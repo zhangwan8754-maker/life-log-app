@@ -40,7 +40,6 @@ export interface WeekStats {
   completed: Task[]
   overdue: Task[]
   open: number
-  thoughts: string[]
   /** 「投入：」速记按名称汇总，时长多的在前 */
   spent: Spent[]
   spentTotal: number
@@ -57,7 +56,6 @@ export function weekStats(
   r: WeekRange,
   dayMd: (date: string) => string | null | undefined,
   todoMd: string,
-  thoughts: { title: string; created: string }[],
   today: string,
 ): WeekStats {
   const mds = r.days.map((d) => dayMd(d) ?? '')
@@ -76,7 +74,6 @@ export function weekStats(
     completed: tasks.filter((t) => t.done && t.doneOn >= r.from && t.doneOn <= r.to),
     overdue: tasks.filter((t) => !t.done && t.date && t.date < today),
     open: tasks.filter((t) => !t.done).length,
-    thoughts: thoughts.filter((t) => t.created >= r.from && t.created <= r.to).map((t) => t.title),
     spent,
     spentTotal: spent.reduce((a, x) => a + x.hours, 0),
     marked: allNotes.map((n) => ({ ...n, kind: noteKind(n.text).kind })).filter((n) => n.kind === 'learned' || n.kind === 'question'),
@@ -92,7 +89,6 @@ export function dataSection(s: WeekStats): string {
     `- 完成待办 ${s.completed.length} 件，逾期 ${s.overdue.length} 件，未完成共 ${s.open} 件`,
   ]
   if (s.spent.length) lines.push(`- 投入 ${fmtHours(s.spentTotal)}：${spentLine(s.spent)}`)
-  if (s.thoughts.length) lines.push(`- 新增思想：${s.thoughts.join('、')}`)
   if (s.completed.length) lines.push('', '完成：', ...s.completed.map((t) => `- ${t.text}（${t.group}）`))
   return lines.join('\n')
 }
