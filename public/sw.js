@@ -1,5 +1,5 @@
 // 只缓存 app 外壳；GitHub API 请求一律走网络（数据的离线能力由 app 自己的队列负责）
-const CACHE = 'life-log-v6'
+const CACHE = 'life-log-v7'
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html', './manifest.webmanifest', './icon-v3.svg'])))

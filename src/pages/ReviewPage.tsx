@@ -2,16 +2,17 @@ import { useState } from 'preact/hooks'
 import { addDays, cnMonthDay } from '../lib/dates'
 import { dayMd, useFile, useStore, useToday, useTree } from '../lib/hooks'
 import { fmtHours, getMeta, score } from '../lib/md'
-import { parsePatterns, parseProposals, PATTERNS, PROPOSALS } from '../lib/memory'
 import { parseMe } from '../lib/me'
+import { parsePatterns, PATTERNS } from '../lib/memory'
 import { aiPrompt, nextSteps, periodLabel, prevWeek, reviewPath, weekOf, weekStats, type WeekStats } from '../lib/review'
 import { store } from '../lib/store'
 import { go, toast } from '../lib/ui'
 import { Heatmap, type Metric, Trend } from '../components/Charts'
 import { ListRow, Tabs } from '../components/Controls'
 import { Icon } from '../components/Icon'
-import { Page } from '../components/Page'
+import { Empty, Page } from '../components/Page'
 import { SpentBars } from '../components/Spent'
+import { useAdvisors } from './AdvicePage'
 import { titleOf } from './ThoughtPage'
 
 export const thoughtIndex = () =>
@@ -40,6 +41,16 @@ export function Stats({ s }: { s: WeekStats }) {
   )
 }
 
+const reviewFiles = () =>
+  store
+    .list('reviews/')
+    .filter((p) => !p.endsWith('_template.md'))
+    .reverse()
+
+/**
+ * 「复盘」主页只留四件事：这一周的复盘、各个 AI 的建议、往回看（数据 / 历史 / 我是谁）、工具。
+ * 图表都收在「数据」里。
+ */
 export function ReviewPage() {
   const s = useStore()
   const today = useToday()
@@ -47,23 +58,15 @@ export function ReviewPage() {
   const todo = useFile('todo.md') ?? ''
   const me = useFile('me.md') ?? ''
   const meDoc = parseMe(me)
-  const [metric, setMetric] = useState<Metric>('mood')
-  const [year, setYear] = useState(Number(today.slice(0, 4)))
+  const all = useAdvisors()
 
   const r = weekOf(today)
   const stats = weekStats(r, dayMd, todo, thoughtIndex(), today)
   const done = s.read(reviewPath(r))
   const prev = prevWeek(r)
-  const patterns = parsePatterns(s.read(PATTERNS))
-  const proposals = parseProposals(s.read(PROPOSALS))
   const prevMissing = s.treeLoaded && today <= addDays(r.from, 1) && !s.read(reviewPath(prev))
-  const last30 = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29))
-  const series = (k: Metric) => last30.map((d) => score(getMeta(dayMd(d) ?? '', k)))
-  const hasTrend = series('mood').some((v) => v !== null) || series('energy').some((v) => v !== null)
-  const reviews = s
-    .list('reviews/')
-    .filter((p) => !p.endsWith('_template.md'))
-    .reverse()
+  const history = reviewFiles().length
+  const weekLine = [`记录 ${stats.daysLogged}/7 天`, stats.spentTotal > 0 && `投入 ${fmtHours(stats.spentTotal)}`].filter(Boolean).join(' · ')
 
   return (
     <Page title="复盘" icon="review">
@@ -84,6 +87,59 @@ export function ReviewPage() {
         )}
       </div>
 
+      {all.length > 0 && (
+        <>
+          <p class="group-label">AI 的建议</p>
+          <div class="group advisors">
+            {all.map((a) => (
+              <ListRow icon="sparkle" label={a.name} detail={a.items.length ? `${a.items.length} 条` : '没有新的'} href={`#/advice/${encodeURIComponent(a.agent)}`} chev />
+            ))}
+          </div>
+        </>
+      )}
+
+      <div class="group">
+        <ListRow icon="chart" label="数据" detail={weekLine} href="#/stats" chev />
+        <ListRow icon="person" label="我是谁" detail={meDoc.filled ? `${meDoc.filled}/${meDoc.total}` : '未填写'} href="#/me" chev />
+        <ListRow icon="journal" label="历史复盘" detail={history ? `${history} 篇` : ''} href="#/history" chev />
+      </div>
+
+      <div class="group">
+        <ListRow
+          icon="copy"
+          label="复制给 AI"
+          detail="本周上下文"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(aiPrompt(r, me, dayMd, todo, stats, { prevNext: nextSteps(s.read(reviewPath(prev))), patterns: parsePatterns(s.read(PATTERNS)) }))
+              toast('已复制，粘贴给任何一个 AI 都能复盘')
+            } catch {
+              toast('复制失败，请检查浏览器权限')
+            }
+          }}
+        />
+        <ListRow icon="settings" label="设置" href="#/settings" chev />
+      </div>
+    </Page>
+  )
+}
+
+/** 数据：本周数字、投入、近 30 天趋势、年度热力图 */
+export function StatsPage() {
+  const today = useToday()
+  useTree('days/', 'thoughts/')
+  const todo = useFile('todo.md') ?? ''
+  const [metric, setMetric] = useState<Metric>('mood')
+  const [year, setYear] = useState(Number(today.slice(0, 4)))
+
+  const r = weekOf(today)
+  const stats = weekStats(r, dayMd, todo, thoughtIndex(), today)
+  const last30 = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29))
+  const series = (k: Metric) => last30.map((d) => score(getMeta(dayMd(d) ?? '', k)))
+  const hasTrend = series('mood').some((v) => v !== null) || series('energy').some((v) => v !== null)
+
+  return (
+    <Page title="数据" icon="chart" back={{ href: '#/review', label: '复盘' }} class="stats-page">
       <p class="group-label">本周</p>
       <Stats s={stats} />
       {stats.spent.length > 0 && (
@@ -98,16 +154,9 @@ export function ReviewPage() {
         </>
       )}
 
-      <p class="group-label">迭代</p>
-      <div class="group">
-        <ListRow icon="sparkle" label="AI 的提议" detail={proposals.length ? `${proposals.length} 条等你决定` : '没有'} href="#/proposals" chev />
-        <ListRow icon="pattern" label="模式" detail={patterns.length ? `${patterns.filter((p) => p.status === '观察中').length} 条观察中` : '还没有'} href="#/memory/patterns" chev />
-        <ListRow icon="person" label="我是谁" detail={meDoc.filled ? `${meDoc.filled}/${meDoc.total}` : '未填写'} href="#/me" chev />
-      </div>
-
       <p class="group-label">近 30 天</p>
       <div class="group chart-group">
-        {hasTrend ? <Trend dates={last30} mood={series('mood')} energy={series('energy')} /> : <p class="group-empty">最近 30 天还没有打分。在「今天」页底部点情绪、精力打分。</p>}
+        {hasTrend ? <Trend dates={last30} mood={series('mood')} energy={series('energy')} /> : <p class="group-empty">最近 30 天还没有打分。在「今天」页点情绪、精力打分。</p>}
       </div>
 
       <div class="group-label row-label-bar">
@@ -132,35 +181,23 @@ export function ReviewPage() {
       <div class="group chart-group">
         <Heatmap year={year} metric={metric} value={(d) => score(getMeta(dayMd(d) ?? '', metric))} has={(d) => !!dayMd(d)} />
       </div>
+    </Page>
+  )
+}
 
+/** 历史复盘：所有周、月复盘，新的在前 */
+export function HistoryPage() {
+  const s = useStore()
+  useTree('reviews/')
+  const files = reviewFiles()
+  return (
+    <Page title="历史复盘" icon="journal" back={{ href: '#/review', label: '复盘' }}>
       <div class="group">
-        <ListRow
-          icon="sparkle"
-          label="复制给 AI"
-          detail="本周上下文"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(aiPrompt(r, me, dayMd, todo, stats, { prevNext: nextSteps(s.read(reviewPath(prev))), patterns }))
-              toast('已复制，粘贴到 Claude 里就能复盘')
-            } catch {
-              toast('复制失败，请检查浏览器权限')
-            }
-          }}
-        />
-        <ListRow icon="settings" label="设置" href="#/settings" chev />
+        {files.map((p) => (
+          <ListRow icon="journal" label={periodLabel(p.replace(/^reviews\/|\.md$/g, ''))} href={`#/file/${encodeURIComponent(p)}`} chev />
+        ))}
+        {s.treeLoaded && !files.length && <Empty icon="journal">还没有复盘。从这一周开始。</Empty>}
       </div>
-
-      {reviews.length > 0 && (
-        <>
-          <p class="group-label">历史复盘</p>
-          <div class="group">
-            {reviews.slice(0, 20).map((p) => {
-              const id = p.replace(/^reviews\/|\.md$/g, '')
-              return <ListRow icon="journal" label={periodLabel(id)} href={`#/file/${encodeURIComponent(p)}`} chev />
-            })}
-          </div>
-        </>
-      )}
     </Page>
   )
 }

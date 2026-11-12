@@ -1,15 +1,18 @@
 /**
  * memory/ —— AI 维护的记忆层（见数据仓库的 AGENTS.md）。
- *   timeline.md   大事记：只读，按 Markdown 显示
- *   patterns.md   模式账本：每个 `## 标题` 是一条假设，「状态：」一行由主人裁决
- *   proposals.md  提议：编号的列表项，主人处理完一条就删一条
- * App 只做两种写入：改一条模式的状态、删一条提议。都是 (旧文本) => 新文本，其余内容逐字保留。
+ *   timeline.md           大事记：只读，按 Markdown 显示
+ *   patterns.md           模式账本：每个 `## 标题` 是一条假设，「状态：」一行由主人裁决
+ *   proposals/<ai>.md     建议：每个 AI 一个文件（claude.md、deepseek.md……），互不覆盖；
+ *                         里面是编号的列表项，主人处理完一条就划掉一条
+ * App 只做两种写入：改一条模式的状态、划掉一条建议。都是 (旧文本) => 新文本，其余内容逐字保留。
  */
 import { getMeta, setMeta, stripFrontmatter } from './md'
 
 export const TIMELINE = 'memory/timeline.md'
 export const PATTERNS = 'memory/patterns.md'
-export const PROPOSALS = 'memory/proposals.md'
+export const PROPOSALS_DIR = 'memory/proposals/'
+/** 只有一个 AI 时的旧位置，仍然读得到 */
+export const LEGACY_PROPOSALS = 'memory/proposals.md'
 
 export const STATUSES = ['观察中', '成立', '推翻'] as const
 export type PatternStatus = (typeof STATUSES)[number]
@@ -136,4 +139,43 @@ export function removeProposal(md: string, key: string, date: string): string {
   ls.splice(hit.from, to - hit.from)
   const out = ls.join('\n')
   return getMeta(out, 'updated') ? setMeta(out, 'updated', date) : out
+}
+
+// ───── 每个 AI 的建议各放各的 ─────
+
+export interface Advisor {
+  /** 文件名里的代号：claude、deepseek…… */
+  agent: string
+  /** 显示的名字 */
+  name: string
+  path: string
+  updated: string
+  items: Proposal[]
+}
+
+const KNOWN: Record<string, string> = { claude: 'Claude', deepseek: 'DeepSeek', gpt: 'GPT', gemini: 'Gemini', kimi: 'Kimi', qwen: '通义千问', doubao: '豆包', ai: 'AI' }
+
+/** memory/proposals/deepseek.md → deepseek；旧的 memory/proposals.md → ai */
+export function agentOf(path: string): string {
+  if (path === LEGACY_PROPOSALS) return 'ai'
+  return path.startsWith(PROPOSALS_DIR) && path.endsWith('.md') ? path.slice(PROPOSALS_DIR.length, -3) : ''
+}
+
+export const advicePath = (agent: string) => (agent === 'ai' ? LEGACY_PROPOSALS : `${PROPOSALS_DIR}${agent}.md`)
+
+/** 文件里写了 `name:` 就用它，否则用常见 AI 的叫法，再否则用代号本身 */
+export const agentName = (agent: string, md?: string | null) => getMeta(md ?? '', 'name') || KNOWN[agent.toLowerCase()] || agent
+
+/** 所有留下过建议文件的 AI，按名字排；旧位置的排最后 */
+export function advisors(paths: string[], read: (path: string) => string | null | undefined): Advisor[] {
+  return paths
+    // 子目录里的、以下划线开头的（模板）不算
+    .filter((p) => agentOf(p) && !agentOf(p).startsWith('_') && !agentOf(p).includes('/'))
+    .map((path) => {
+      const md = read(path)
+      const agent = agentOf(path)
+      return { agent, name: agentName(agent, md), path, updated: getMeta(md ?? '', 'updated'), items: parseProposals(md) }
+    })
+    .filter((a) => a.agent !== 'ai' || a.items.length > 0)
+    .sort((a, b) => Number(a.agent === 'ai') - Number(b.agent === 'ai') || a.name.localeCompare(b.name))
 }

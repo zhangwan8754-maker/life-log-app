@@ -301,8 +301,11 @@
 .done-group {
   margin-top: 4px;
 }
-.below + .group {
+.below + .done-group {
   margin-top: 4px;
+}
+.below + .group:not(.done-group) {
+  margin-top: 14px;
 }
 .add-row.ghost .icon {
   color: var(--accent);
@@ -1991,60 +1994,48 @@ mark {
    v4 —— 围绕「捕获 → 沉淀 → 记忆 → 复盘 → 迭代」
    ──────────────────────────────────────────── */
 
-/* ───── 今天：状态 ───── */
-.meters {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* ───── 今天：情绪和精力收在日期那一行 ───── */
+.day-nav {
+  flex-wrap: wrap;
+  row-gap: 6px;
 }
-.meter {
+.score-pills {
   display: flex;
-  flex-direction: column;
-  gap: 11px;
-  padding: 14px 16px 16px;
-  text-align: left;
-  transition: background 0.12s;
+  gap: 6px;
+  margin-left: auto;
 }
-.meter + .meter {
-  box-shadow: inset 1px 0 0 var(--line);
-}
-.meter:active {
-  background: var(--fill);
-}
-.meter-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-.meter-name {
-  font-size: 15px;
+.score-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 15px;
+  background: var(--group);
+  font-size: 14px;
   color: var(--text-3);
+  transition: transform 0.12s var(--ease);
 }
-.meter b {
-  font-size: 26px;
+.score-pill:active {
+  transform: scale(0.95);
+}
+.score-pill b {
+  font-size: 15px;
   font-weight: 650;
-  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.meter.unset b {
+.score-pill.mood b {
+  color: color-mix(in oklab, var(--mood) 70%, var(--text));
+}
+.score-pill.energy b {
+  color: color-mix(in oklab, var(--energy) 76%, var(--text));
+}
+.score-pill.unset b {
   font-weight: 400;
   color: var(--text-4);
 }
-.meter-bar {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 3px;
-}
-.meter-bar i {
-  height: 5px;
-  border-radius: 2.5px;
-  background: var(--fill-2);
-  transition: background 0.2s;
-}
-.meter.mood .meter-bar i.on {
-  background: var(--mood);
-}
-.meter.energy .meter-bar i.on {
-  background: var(--energy);
+.below.alone {
+  padding-top: 0;
 }
 
 .label-bar {
@@ -2095,7 +2086,7 @@ mark {
 }
 .journal-meta {
   font-size: 13px;
-  color: var(--accent);
+  color: var(--text-3);
 }
 .journal-hint {
   display: flex;
@@ -2149,24 +2140,6 @@ mark {
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
-.spent-tap {
-  display: block;
-  width: 100%;
-  text-align: left;
-  transition: background 0.12s;
-}
-.spent-tap:active {
-  background: var(--fill);
-}
-.group .spent-tap + .row::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 16px;
-  right: 0;
-  height: 1px;
-  background: var(--line);
-}
 .spent-sheet .chips {
   margin-top: 12px;
 }
@@ -2196,14 +2169,51 @@ mark {
 
 /* ───── 速记：页面上直接记；种类标签 ───── */
 .note-add.inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin: 0;
   padding: 0 16px;
 }
-.notes + .note-add.inline {
+.notes + .note-add.inline,
+.spent-line + .note-add.inline {
   border-top: 1px solid var(--line);
 }
-.note-add.inline input {
+/* 投入：速记卡片里的一行小结，点开看明细 */
+.spent-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
   width: 100%;
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 15px;
+  transition: background 0.12s;
+}
+.spent-line:active {
+  background: var(--fill);
+}
+.notes + .spent-line {
+  border-top: 1px solid var(--line);
+}
+.spent-line-total {
+  flex: none;
+  font-weight: 600;
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+.spent-line-items {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.note-add.inline input {
+  flex: 1;
+  min-width: 0;
   height: 52px;
   border: 0;
   outline: none;
@@ -2380,11 +2390,6 @@ mark {
   font-size: 18px;
   font-weight: 600;
   line-height: 1.4;
-}
-.pattern-note {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--text-3);
 }
 .verdict {
   display: grid;

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { addDays, cnMonthDay, parseYmd, shortWeekday, weekday, ymd } from '../lib/dates'
 import { useStore, useToday, useTree } from '../lib/hooks'
 import { daySpent, fmtHours, getMeta, getSection, noteKind, parseNotes, score, stripFrontmatter, thoughtBody, type NoteKind } from '../lib/md'
-import { parsePatterns, parseProposals, PATTERNS, PROPOSALS, STATUSES, TIMELINE, type Pattern } from '../lib/memory'
+import { parsePatterns, PATTERNS, STATUSES, TIMELINE, type Pattern } from '../lib/memory'
 import { store } from '../lib/store'
 import { cx, go, markdown } from '../lib/ui'
 import { Chip, ListRow, Tabs } from '../components/Controls'
@@ -13,7 +13,7 @@ import { Sheet } from '../components/Sheet'
 import { spentTotal } from '../components/Spent'
 import { tagsOf, titleOf } from './ThoughtPage'
 
-export type MemorySeg = 'timeline' | 'thoughts' | 'patterns'
+export type MemorySeg = 'timeline' | 'notes' | 'thoughts' | 'patterns'
 interface DayDoc {
   date: string
   md: string
@@ -25,6 +25,7 @@ const journalOf = (md: string) => (getSection(md, '日记') ?? '').replace(/\s+/
 /**
  * 记忆：想得起。
  *   时间线 —— 过去的每一天，以及「那时的今天」
+ *   速记   —— 所有速记，可以只看「学到」或「问题」
  *   思想   —— 沉淀下来的卡片
  *   模式   —— AI 记下的假设，由我裁决
  * 顶上的搜索同时找思想、速记和日记。
@@ -44,7 +45,6 @@ export function MemoryPage({ seg }: { seg: MemorySeg }) {
     .filter((d) => d.date)
     .sort((a, b) => b.date.localeCompare(a.date))
   const patterns = parsePatterns(s.read(PATTERNS))
-  const proposals = parseProposals(s.read(PROPOSALS))
 
   return (
     <Page
@@ -69,15 +69,17 @@ export function MemoryPage({ seg }: { seg: MemorySeg }) {
               value={seg}
               options={[
                 { value: 'timeline', label: '时间线' },
-                { value: 'thoughts', label: `思想${thoughts.length ? ` ${thoughts.length}` : ''}` },
-                { value: 'patterns', label: `模式${patterns.length ? ` ${patterns.length}` : ''}` },
+                { value: 'notes', label: '速记' },
+                { value: 'thoughts', label: '思想' },
+                { value: 'patterns', label: '模式' },
               ]}
               onChange={(v) => go(v === 'timeline' ? '#/memory' : `#/memory/${v}`)}
             />
           </div>
           {seg === 'timeline' && <Timeline days={days} loaded={loaded} hasAiTimeline={!!s.read(TIMELINE)} />}
+          {seg === 'notes' && <NoteStream days={days} />}
           {seg === 'thoughts' && <Thoughts thoughts={thoughts} loaded={loaded} />}
-          {seg === 'patterns' && <Patterns patterns={patterns} proposals={proposals.length} loaded={loaded} />}
+          {seg === 'patterns' && <Patterns patterns={patterns} loaded={loaded} />}
         </>
       )}
     </Page>
@@ -86,10 +88,9 @@ export function MemoryPage({ seg }: { seg: MemorySeg }) {
 
 // ───── 时间线 ─────
 
-type Filter = 'all' | 'notes' | 'learned' | 'question'
+type Filter = 'notes' | 'learned' | 'question'
 const FILTERS: [Filter, string][] = [
-  ['all', '每一天'],
-  ['notes', '速记'],
+  ['notes', '全部'],
   ['learned', '学到'],
   ['question', '问题'],
 ]
@@ -143,59 +144,12 @@ function DayCard({ day, label }: { day: DayDoc; label?: string }) {
 
 function Timeline({ days, loaded, hasAiTimeline }: { days: DayDoc[]; loaded: boolean; hasAiTimeline: boolean }) {
   const today = useToday()
-  const [filter, setFilter] = useState<Filter>('all')
   const [shown, setShown] = useState(PAGE)
-  useEffect(() => setShown(PAGE), [filter])
   const back = recall(today, days)
-
-  const chips = (
-    <div class="chips scroll">
-      {FILTERS.map(([v, label]) => (
-        <Chip on={filter === v} onClick={() => setFilter(v)}>
-          {label}
-        </Chip>
-      ))}
-    </div>
-  )
-
-  if (filter !== 'all') {
-    const want = (k: NoteKind) => (filter === 'notes' ? k !== 'spent' : k === filter)
-    const withNotes = days.map((d) => ({ ...d, notes: parseNotes(d.md).filter((n) => want(noteKind(n.text).kind)) })).filter((d) => d.notes.length)
-    return (
-      <>
-        {chips}
-        {withNotes.length === 0 ? (
-          <div class="group">
-            <Empty icon="note">
-              {filter === 'notes' ? '还没有速记。点右下角 ＋ 随手记一条。' : `还没有标了「${filter === 'learned' ? '学到' : '问题'}」的速记。记速记时选一下种类，以后就能在这里一起看。`}
-            </Empty>
-          </div>
-        ) : (
-          withNotes.slice(0, shown).map((d) => (
-            <>
-              <a class="group-label link" href={`#/day/${d.date}`}>
-                {cnMonthDay(d.date)} {weekday(d.date)}
-              </a>
-              <div class="group">
-                <ul class="notes in-group">
-                  {d.notes.map((n) => (
-                    <NoteRow date={d.date} note={n} />
-                  ))}
-                </ul>
-              </div>
-            </>
-          ))
-        )}
-        {withNotes.length > shown && <More left={withNotes.length - shown} onClick={() => setShown(shown + PAGE)} />}
-      </>
-    )
-  }
-
   const page = days.slice(0, shown)
   const months = [...new Set(page.map((d) => d.date.slice(0, 7)))]
   return (
     <>
-      {chips}
       {back.length > 0 && (
         <>
           <p class="group-label">那时的今天</p>
@@ -231,6 +185,49 @@ function Timeline({ days, loaded, hasAiTimeline }: { days: DayDoc[]; loaded: boo
           <ListRow icon="sparkle" label="大事记" detail="AI 整理" href={`#/file/${TIMELINE}`} chev />
         </div>
       )}
+    </>
+  )
+}
+
+/** 所有速记，按天分组；可以只看标了「学到」或「问题」的 */
+function NoteStream({ days }: { days: DayDoc[] }) {
+  const [filter, setFilter] = useState<Filter>('notes')
+  const [shown, setShown] = useState(PAGE)
+  useEffect(() => setShown(PAGE), [filter])
+  const want = (k: NoteKind) => (filter === 'notes' ? k !== 'spent' : k === filter)
+  const withNotes = days.map((d) => ({ ...d, notes: parseNotes(d.md).filter((n) => want(noteKind(n.text).kind)) })).filter((d) => d.notes.length)
+  return (
+    <>
+      <div class="chips scroll">
+        {FILTERS.map(([v, label]) => (
+          <Chip on={filter === v} onClick={() => setFilter(v)}>
+            {label}
+          </Chip>
+        ))}
+      </div>
+      {withNotes.length === 0 ? (
+        <div class="group">
+          <Empty icon="note">
+            {filter === 'notes' ? '还没有速记。点右下角 ＋ 随手记一条。' : `还没有标了「${filter === 'learned' ? '学到' : '问题'}」的速记。记速记时选一下种类，以后就能在这里一起看。`}
+          </Empty>
+        </div>
+      ) : (
+        withNotes.slice(0, shown).map((d) => (
+          <>
+            <a class="group-label link" href={`#/day/${d.date}`}>
+              {cnMonthDay(d.date)} {weekday(d.date)}
+            </a>
+            <div class="group">
+              <ul class="notes in-group">
+                {d.notes.map((n) => (
+                  <NoteRow date={d.date} note={n} />
+                ))}
+              </ul>
+            </div>
+          </>
+        ))
+      )}
+      {withNotes.length > shown && <More left={withNotes.length - shown} onClick={() => setShown(shown + PAGE)} />}
     </>
   )
 }
@@ -286,17 +283,11 @@ function Thoughts({ thoughts, loaded }: { thoughts: { p: string; md: string }[];
 
 const STATUS_CLASS: Record<string, string> = { 观察中: 'watching', 成立: 'holds', 推翻: 'rejected' }
 
-function Patterns({ patterns, proposals, loaded }: { patterns: Pattern[]; proposals: number; loaded: boolean }) {
+function Patterns({ patterns, loaded }: { patterns: Pattern[]; loaded: boolean }) {
   const [open, setOpen] = useState<string | null>(null)
   const cur = patterns.find((p) => p.heading === open) ?? null
   return (
     <>
-      <p class="group-note lead">重复出现的事。AI 复盘时带着证据和反例记在这里，每一条都只是假设 —— 成立还是推翻，由你定。</p>
-      {proposals > 0 && (
-        <div class="group">
-          <ListRow icon="sparkle" label="AI 的提议" detail={`${proposals} 条等你决定`} href="#/proposals" chev />
-        </div>
-      )}
       <div class="group">
         {patterns.map((p) => (
           <button type="button" class="row pattern-row" onClick={() => setOpen(p.heading)}>
@@ -305,11 +296,11 @@ function Patterns({ patterns, proposals, loaded }: { patterns: Pattern[]; propos
               {p.status && <span class={cx('status-chip', STATUS_CLASS[p.status])}>{p.status}</span>}
             </span>
             <span class="pattern-title">{p.title}</span>
-            {p.note && <span class="pattern-note">{p.note}</span>}
           </button>
         ))}
         {loaded && !patterns.length && <Empty icon="pattern">还没有记下模式。让 AI 帮你复盘一次，它会把重复出现的事写进 memory/patterns.md，然后出现在这里。</Empty>}
       </div>
+      {patterns.length > 0 && <p class="group-note">AI 记下的假设，带证据和反例。点开一条，成立还是推翻由你定。</p>}
       <PatternSheet pattern={cur} onClose={() => setOpen(null)} />
     </>
   )

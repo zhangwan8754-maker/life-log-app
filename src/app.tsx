@@ -11,10 +11,10 @@ import { PlanHome, SideNav } from './pages/HomePage'
 import { JournalPage } from './pages/JournalPage'
 import { MePage } from './pages/MePage'
 import { MemoryPage } from './pages/MemoryPage'
-import { ProposalsPage } from './pages/ProposalsPage'
+import { AdvicePage } from './pages/AdvicePage'
 import { UpcomingPage } from './pages/UpcomingPage'
 import { ProjectPage } from './pages/ProjectPage'
-import { ReviewPage } from './pages/ReviewPage'
+import { HistoryPage, ReviewPage, StatsPage } from './pages/ReviewPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { ThoughtPage } from './pages/ThoughtPage'
 import { TodayPage } from './pages/TodayPage'
@@ -32,7 +32,7 @@ const parse = (): Route => {
 /** 层级：四个主页 0，进入一层 1，再深一层 2。决定切换动画的方向 */
 const DEPTH: Record<string, number> = {
   '': 0, day: 0, home: 0, plan: 0, memory: 0, notes: 0, review: 0,
-  upcoming: 1, project: 1, journal: 1, thought: 1, week: 1, me: 1, settings: 1, proposals: 1,
+  upcoming: 1, project: 1, journal: 1, thought: 1, week: 1, me: 1, settings: 1, advice: 1, proposals: 1, stats: 1, history: 1,
   file: 2,
 }
 
@@ -41,7 +41,7 @@ const TAB_OF: Record<string, Tab> = {
   '': 'today', day: 'today', journal: 'today',
   home: 'plan', plan: 'plan', upcoming: 'plan', project: 'plan',
   memory: 'memory', notes: 'memory', thought: 'memory',
-  review: 'review', week: 'review', me: 'review', file: 'review', settings: 'review', proposals: 'review',
+  review: 'review', week: 'review', me: 'review', file: 'review', settings: 'review', advice: 'review', proposals: 'review', stats: 'review', history: 'review',
 }
 const TABS: [Tab, string, string, string][] = [
   ['today', '#/', '今天', 'today'],
@@ -103,10 +103,13 @@ function Page({ r }: { r: Route }) {
     case 'journal': return <JournalPage date={a} />
     case 'upcoming': return <UpcomingPage />
     case 'project': return <ProjectPage name={a} />
-    case 'memory': return <MemoryPage seg={a === 'thoughts' || a === 'patterns' ? a : 'timeline'} />
+    case 'memory': return <MemoryPage seg={a === 'notes' || a === 'thoughts' || a === 'patterns' ? a : 'timeline'} />
     // 旧地址：笔记 → 记忆
-    case 'notes': return <MemoryPage seg={a === 'stream' ? 'timeline' : 'thoughts'} />
-    case 'proposals': return <ProposalsPage />
+    case 'notes': return <MemoryPage seg={a === 'stream' ? 'notes' : 'thoughts'} />
+    case 'advice':
+    case 'proposals': return <AdvicePage agent={a} />
+    case 'stats': return <StatsPage />
+    case 'history': return <HistoryPage />
     case 'thought': return <ThoughtPage arg={[a, b].filter(Boolean).join('/')} />
     case 'review': return <ReviewPage />
     case 'week': return <WeekPage id={a} />

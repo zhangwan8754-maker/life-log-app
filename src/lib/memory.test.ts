@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parsePatterns, parseProposals, removeProposal, setPatternStatus } from './memory'
+import { advicePath, advisors, agentName, agentOf, parsePatterns, parseProposals, removeProposal, setPatternStatus } from './memory'
 
 const patterns = `---
 updated: 2026-11-11
@@ -101,5 +101,33 @@ describe('提议', () => {
     expect(md).toContain('埋在日记里的句子。\n\n1. [11-10]')
     expect(md).toMatch(/^---\nupdated: 2026-11-12\n---/)
     expect(removeProposal(md, '不存在', '2026-11-12')).toBe(md)
+  })
+})
+
+describe('每个 AI 的建议各放各的', () => {
+  const files: Record<string, string> = {
+    'memory/proposals/deepseek.md': '---\nupdated: 2026-11-12\n---\n# 建议\n\n## 2026-W46\n\n1. 早点睡\n2. 少刷手机\n',
+    'memory/proposals/claude.md': proposals,
+    'memory/proposals/local-llm.md': '---\nname: 本地模型\n---\n# 建议\n',
+    'memory/proposals.md': '# 提议\n\n1. 旧位置的一条\n',
+    'memory/proposals/archive/old.md': '1. 子目录里的不算\n',
+    'memory/proposals/_template.md': '1. 模板不算\n',
+    'memory/patterns.md': '',
+  }
+  it('按文件名认出是哪个 AI，各自解析', () => {
+    const as = advisors(Object.keys(files), (p) => files[p])
+    expect(as.map((a) => [a.agent, a.name, a.items.length, a.updated])).toEqual([
+      ['claude', 'Claude', 4, '2026-11-11'],
+      ['deepseek', 'DeepSeek', 2, '2026-11-12'],
+      ['local-llm', '本地模型', 0, ''],
+      ['ai', 'AI', 1, ''],
+    ])
+    expect(as[1].items[0]).toMatchObject({ n: 1, section: '2026-W46', key: '早点睡' })
+  })
+  it('旧位置清空后不再显示；代号与路径互相对得上', () => {
+    expect(advisors(['memory/proposals.md'], () => '# 提议\n').length).toBe(0)
+    expect([agentOf('memory/proposals/deepseek.md'), agentOf('memory/proposals.md'), agentOf('memory/patterns.md')]).toEqual(['deepseek', 'ai', ''])
+    expect([advicePath('deepseek'), advicePath('ai')]).toEqual(['memory/proposals/deepseek.md', 'memory/proposals.md'])
+    expect([agentName('DeepSeek'), agentName('mybot'), agentName('mybot', '---\nname: 小助手\n---\n')]).toEqual(['DeepSeek', 'mybot', '小助手'])
   })
 })

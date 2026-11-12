@@ -11,30 +11,23 @@ import { type Metric, METRIC_NAME } from '../components/Charts'
 import { Icon } from '../components/Icon'
 import { Page } from '../components/Page'
 import { Sheet } from '../components/Sheet'
-import { SpentBars, spentTotal } from '../components/Spent'
+import { spentTotal } from '../components/Spent'
 import { TaskRow } from '../components/TaskRow'
 import { NoteRow } from '../components/NoteSheet'
 
-/** 情绪 / 精力：一个数字加十格刻度，点开打分 */
-function Meter({ metric, value, onClick }: { metric: Metric; value: number | null; onClick: () => void }) {
+/** 情绪 / 精力：标题旁的一枚小标签，点开打分 */
+function ScorePill({ metric, value, onClick }: { metric: Metric; value: number | null; onClick: () => void }) {
   return (
-    <button type="button" class={cx('meter', metric, value === null && 'unset')} aria-label={`${METRIC_NAME[metric]} ${value ?? '未打分'}`} onClick={onClick}>
-      <span class="meter-top">
-        <span class="meter-name">{METRIC_NAME[metric]}</span>
-        <b>{value ?? '—'}</b>
-      </span>
-      <span class="meter-bar" aria-hidden="true">
-        {Array.from({ length: 10 }, (_, i) => (
-          <i class={cx(value !== null && i < value && 'on')} />
-        ))}
-      </span>
+    <button type="button" class={cx('score-pill', metric, value === null && 'unset')} aria-label={`${METRIC_NAME[metric]} ${value ?? '未打分'}`} onClick={onClick}>
+      {METRIC_NAME[metric]}
+      <b>{value ?? '—'}</b>
     </button>
   )
 }
 
 /**
- * 一天的全部：状态、要做的事、日记、投入、速记。
- * 这是「捕获」的入口 —— 记录和待办同样重要，所以都直接摆在页面上，不藏在弹层里。
+ * 一天的全部，只有三块：要做的事、日记、速记（投入并在速记里）。
+ * 情绪和精力收在日期那一行。没有内容的块不占地方。
  */
 export function TodayPage({ date }: { date?: string }) {
   const today = useToday()
@@ -42,7 +35,7 @@ export function TodayPage({ date }: { date?: string }) {
   const isToday = d === today
   const path = dayPath(d)
   const md = useFile(path) ?? ''
-  const { groups, loading } = useTodo()
+  const { groups } = useTodo()
   const rec = useBox(recent)
   useTree('days/')
   const [score_, setScore] = useState<Metric | null>(null)
@@ -61,7 +54,8 @@ export function TodayPage({ date }: { date?: string }) {
   const journal = (getSection(md, '日记') ?? '').trim()
   const mood = score(getMeta(md, 'mood'))
   const energy = score(getMeta(md, 'energy'))
-  const past = d <= today
+  const past = d < today
+  const openSpent = () => A.spentSheet.set({ date: d })
 
   const prev = addDays(d, -1)
   const next = addDays(d, 1)
@@ -81,31 +75,27 @@ export function TodayPage({ date }: { date?: string }) {
           回到今天
         </a>
       )}
+      <span class="score-pills">
+        <ScorePill metric="mood" value={mood} onClick={() => setScore('mood')} />
+        <ScorePill metric="energy" value={energy} onClick={() => setScore('energy')} />
+      </span>
     </div>
   )
 
   return (
     <Page title={isToday ? '今天' : cnMonthDay(d)} icon={isToday ? 'today' : 'calendar'} subtitle={subtitle} class="today">
-      <div class="group meters">
-        <Meter metric="mood" value={mood} onClick={() => setScore('mood')} />
-        <Meter metric="energy" value={energy} onClick={() => setScore('energy')} />
-      </div>
-
-      <p class="group-label">{isToday ? '要做的事' : '这一天的事'}</p>
-      <div class="group">
-        {due.length > 0 ? (
+      {due.length > 0 && (
+        <div class="group">
           <div class="tasks">
             {due.map((t) => (
               <TaskRow task={t} today={today} showDate={t.date < d} />
             ))}
           </div>
-        ) : (
-          !loading && <p class="group-empty">{isToday ? (doneHere.length ? '今天的事都做完了。' : '今天没有安排，留一点空白也很好。') : '这一天没有安排。'}</p>
-        )}
-      </div>
+        </div>
+      )}
       {doneHere.length > 0 && (
         <>
-          <div class="below">
+          <div class={cx('below', !due.length && 'alone')}>
             <button type="button" class="text-btn muted small" onClick={() => setShowDone(!showDone)}>
               {showDone ? '收起已完成' : `已完成 ${doneHere.length} 件`}
             </button>
@@ -122,12 +112,11 @@ export function TodayPage({ date }: { date?: string }) {
         </>
       )}
 
-      <p class="group-label">日记</p>
       <a class={cx('group journal-card', journal && 'has')} href={`#/journal/${d}`} aria-label="日记">
         {journal ? (
           <>
             <span class="journal-excerpt">{journal.replace(/\n\s*\n/g, '\n')}</span>
-            <span class="journal-meta">{journal.replace(/\s/g, '').length} 字 · 接着写</span>
+            <span class="journal-meta">日记 · {journal.replace(/\s/g, '').length} 字</span>
           </>
         ) : (
           <span class="journal-hint">
@@ -137,57 +126,47 @@ export function TodayPage({ date }: { date?: string }) {
         )}
       </a>
 
-      {(past || spent.length > 0) && (
-        <>
-          <p class="group-label label-bar">
-            <span>投入</span>
-            {spent.length > 0 && <span class="label-detail">合计 {fmtHours(spentTotal(spent))}</span>}
-          </p>
-          <div class="group spent-group">
-            {spent.length > 0 && (
-              <button type="button" class="spent-tap" aria-label="查看和修改投入" onClick={() => A.spentSheet.set({ date: d })}>
-                <SpentBars items={spent} />
+      {(isToday || notes.length > 0 || spent.length > 0) && (
+        <div class="group day-notes">
+          {notes.length > 0 && (
+            <ul class="notes in-group">
+              {notes.map((n) => (
+                <NoteRow date={d} note={n} />
+              ))}
+            </ul>
+          )}
+          {spent.length > 0 && (
+            <button type="button" class="spent-line" aria-label="查看和修改投入" onClick={openSpent}>
+              <span class="spent-line-total">投入 {fmtHours(spentTotal(spent))}</span>
+              <span class="spent-line-items">{spent.map((x) => `${x.name} ${fmtHours(x.hours)}`).join(' · ')}</span>
+            </button>
+          )}
+          {isToday && (
+            <form
+              class="note-add inline"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const v = text.trim()
+                if (!v) return
+                A.addNote(d, v)
+                setText('')
+              }}
+            >
+              <input value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} placeholder="记一条速记……" enterKeyHint="send" aria-label="速记" />
+              <button type="button" class="text-btn small spent-btn" onClick={openSpent}>
+                记投入
               </button>
-            )}
-            {past && (
-              <button type="button" class="row add-spent" onClick={() => A.spentSheet.set({ date: d })}>
-                <span class="row-icon">
-                  <Icon name="plus" size={22} />
-                </span>
-                <span class="row-label muted">记一笔</span>
-                {!spent.length && <span class="row-detail">时间花在哪了</span>}
-              </button>
-            )}
-          </div>
-        </>
+            </form>
+          )}
+        </div>
       )}
-
-      <p class="group-label">速记</p>
-      <div class="group day-notes">
-        {notes.length > 0 && (
-          <ul class="notes in-group">
-            {notes.map((n) => (
-              <NoteRow date={d} note={n} />
-            ))}
-          </ul>
-        )}
-        {isToday ? (
-          <form
-            class="note-add inline"
-            onSubmit={(e) => {
-              e.preventDefault()
-              const v = text.trim()
-              if (!v) return
-              A.addNote(d, v)
-              setText('')
-            }}
-          >
-            <input value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} placeholder="记一条……" enterKeyHint="send" aria-label="速记" />
-          </form>
-        ) : (
-          !notes.length && <p class="group-empty">这一天没有速记。</p>
-        )}
-      </div>
+      {past && (
+        <div class="below">
+          <button type="button" class="text-btn muted small spent-btn" onClick={openSpent}>
+            补记投入
+          </button>
+        </div>
+      )}
 
       <ScoreSheet metric={score_} date={d} md={md} onClose={() => setScore(null)} />
       <CalendarSheet open={cal} date={d} onClose={() => setCal(false)} />
