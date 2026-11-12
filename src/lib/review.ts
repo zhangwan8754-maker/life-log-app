@@ -2,6 +2,7 @@
 import { addDays, isoWeek, parseYmd } from './dates'
 import { fmtHours, getMeta, getSection, noteKind, parseNotes, parseSpent, score, setSection, stripFrontmatter, sumSpent, type NoteKind, type Spent } from './md'
 import type { Pattern } from './memory'
+import { meTargets, progressLine, targetProgress, type Progress } from './targets'
 import { allTasks, parseTodo, type Task } from './todo'
 
 export interface WeekRange {
@@ -43,6 +44,8 @@ export interface WeekStats {
   /** 「投入：」速记按名称汇总，时长多的在前 */
   spent: Spent[]
   spentTotal: number
+  /** me.md 里的每周目标，和这一周实际投入的对照；没设目标时为空 */
+  targets: Progress[]
   /** 标了「学到 / 问题」的速记 */
   marked: { date: string; time: string; text: string; kind: NoteKind }[]
 }
@@ -57,6 +60,7 @@ export function weekStats(
   dayMd: (date: string) => string | null | undefined,
   todoMd: string,
   today: string,
+  meMd: string | null = '',
 ): WeekStats {
   const mds = r.days.map((d) => dayMd(d) ?? '')
   const mood = mds.map((m) => score(getMeta(m, 'mood')))
@@ -76,6 +80,7 @@ export function weekStats(
     open: tasks.filter((t) => !t.done).length,
     spent,
     spentTotal: spent.reduce((a, x) => a + x.hours, 0),
+    targets: targetProgress(meTargets(meMd), spent).items,
     marked: allNotes.map((n) => ({ ...n, kind: noteKind(n.text).kind })).filter((n) => n.kind === 'learned' || n.kind === 'question'),
   }
 }
@@ -89,6 +94,7 @@ export function dataSection(s: WeekStats): string {
     `- 完成待办 ${s.completed.length} 件，逾期 ${s.overdue.length} 件，未完成共 ${s.open} 件`,
   ]
   if (s.spent.length) lines.push(`- 投入 ${fmtHours(s.spentTotal)}：${spentLine(s.spent)}`)
+  if (s.targets.length) lines.push(`- 每周目标：${progressLine(s.targets)}`)
   if (s.completed.length) lines.push('', '完成：', ...s.completed.map((t) => `- ${t.text}（${t.group}）`))
   return lines.join('\n')
 }

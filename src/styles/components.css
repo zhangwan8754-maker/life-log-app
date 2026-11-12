@@ -2077,6 +2077,127 @@ mark {
   font-size: 16px;
 }
 
+/* 每周目标：实际 / 目标 */
+.target-bars li {
+  grid-template-columns: minmax(3.2em, 24%) 1fr auto;
+}
+.target-bars .spent-hours {
+  min-width: 5.6em;
+  color: var(--text-3);
+}
+.target-bars .spent-hours b {
+  font-weight: 600;
+  color: var(--text);
+}
+/* 达到目标：不另起一种颜色，条走满、数字换成强调色并打勾 */
+.target-bars li.met .spent-track i {
+  background: var(--accent-strong);
+}
+.target-bars li.met .spent-hours b {
+  color: var(--accent-strong);
+}
+.label-btn {
+  height: 22px;
+  margin: -4px 0;
+  letter-spacing: 0;
+}
+.target-rows {
+  display: grid;
+  gap: 2px;
+}
+.target-row {
+  display: grid;
+  grid-template-columns: 1fr 3.4em auto 36px;
+  align-items: center;
+  gap: 10px;
+}
+.target-hours {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.target-unit {
+  font-size: 15px;
+  color: var(--text-3);
+}
+.target-add {
+  margin-top: 16px;
+}
+.target-sheet .quick-bottom .hint {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 计时 */
+.timer-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px 12px;
+}
+.timer-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.timer-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: timer-pulse 1.6s ease-in-out infinite;
+}
+@keyframes timer-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .timer-dot {
+    animation: none;
+  }
+}
+.timer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 600;
+}
+.timer-clock {
+  flex: none;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-strong);
+}
+.timer-bottom {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.timer-since {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.timer-start {
+  margin-top: 18px;
+  height: 44px;
+  font-size: 16px;
+}
+.timer-start:disabled {
+  background: var(--fill);
+  color: var(--text-4);
+}
+.timer-note {
+  margin: 18px 0 0;
+  font-size: 15px;
+  color: var(--text-3);
+}
+
 /* ───── 速记：页面上直接记；种类标签 ───── */
 .note-add.inline {
   display: flex;
@@ -2103,8 +2224,17 @@ mark {
 .spent-line:active {
   background: var(--fill);
 }
-.notes + .spent-line {
+.notes + .spent-line,
+.spent-line + .spent-line {
   border-top: 1px solid var(--line);
+}
+a.spent-line {
+  color: inherit;
+  text-decoration: none;
+}
+.target-line .spent-line-total {
+  color: var(--text-3);
+  font-weight: 500;
 }
 .spent-line-total {
   flex: none;

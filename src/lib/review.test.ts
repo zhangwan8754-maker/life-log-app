@@ -77,6 +77,20 @@ describe('投入、下一步、叫法', () => {
     expect(dataSection(s)).toContain('- 投入 3.5h：写代码 2.5h、英语 1h')
   })
 
+  it('me.md 里设了每周目标：统计里带上进度，并写进数据', async () => {
+    const { dataSection, weekOf, weekStats } = await import('./review')
+    const r = weekOf('2026-11-05')
+    const ds: Record<string, string> = { '2026-11-02': day('2026-11-02', 6, 5, ['投入：英语语法 1h，数学 30min']) }
+    const me = '# 我是谁\n\n## 方向\n\n### 这学期\n\n### 每周投入\n\n- 英语 14h\n- 数学 10h\n'
+    const s = weekStats(r, (d) => ds[d], todo, '2026-11-05', me)
+    expect(s.targets).toEqual([
+      { name: '英语', hours: 14, done: 1 },
+      { name: '数学', hours: 10, done: 0.5 },
+    ])
+    expect(dataSection(s)).toContain('- 每周目标：英语 1h/14h、数学 0.5h/10h')
+    expect(weekStats(r, (d) => ds[d], todo, '2026-11-05').targets).toEqual([])
+  })
+
   it('读出上一期的下一步', async () => {
     const { nextSteps, periodLabel, prevWeek, weekOf } = await import('./review')
     expect(nextSteps('## 下一步\n\n- 早睡\n- [ ] 每天读书 1h\n2. 周日做计划\n<!-- 注释 -->\n')).toEqual(['早睡', '每天读书 1h', '周日做计划'])

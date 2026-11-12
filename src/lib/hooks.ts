@@ -62,3 +62,20 @@ export function useAutoGrow(value: string) {
   }, [value])
   return ref
 }
+
+/** 现在的时刻；active 时每秒更新一次（计时用） */
+export function useNow(active: boolean) {
+  const [now, set] = useState(Date.now())
+  useEffect(() => {
+    if (!active) return
+    const tick = () => set(Date.now())
+    tick()
+    const id = setInterval(tick, 1000)
+    addEventListener('visibilitychange', tick)
+    return () => {
+      clearInterval(id)
+      removeEventListener('visibilitychange', tick)
+    }
+  }, [active])
+  return now
+}

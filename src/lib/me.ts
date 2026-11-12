@@ -2,7 +2,7 @@
  * me.md（我是谁）的结构：五个问题。
  *   现在 —— 我在哪（只写事实）
  *   在乎 —— 我的尺子：让我有劲的 / 耗我的 / 好的一天
- *   方向 —— 这学期 / 毕业时 / 更远
+ *   方向 —— 这学期 / 每周投入（每科一周打算投入几小时，见 targets.ts）/ 毕业时 / 更远
  *   做法 —— 验证过的 / 借来的（读到、听到，还没自己试过）
  *   还没想清楚 —— 答不上来、但想弄明白的问题
  * 引导问题只在 App 里显示，不写进文件。写操作是纯函数 (旧文本) => 新文本：
@@ -14,6 +14,8 @@ export interface FieldDef {
   /** 小栏标题；空字符串表示这一栏没有小栏，整栏就是一个输入 */
   sub: string
   hint: string
+  /** 可填可不填：不算进「已填 x / y」 */
+  optional?: boolean
 }
 export interface SectionDef {
   title: string
@@ -37,6 +39,7 @@ export const ME_SECTIONS: SectionDef[] = [
     note: '',
     fields: [
       { sub: '这学期', hint: '这学期结束时，我希望哪几件事是真的做成了？' },
+      { sub: '每周投入', hint: '每科一周打算投入多少小时？复盘时拿实际记下的投入来对。', optional: true },
       { sub: '毕业时', hint: '毕业那天，我想成为什么样、手里有什么？' },
       { sub: '更远', hint: '只是猜想，写错了随时改。' },
     ],
@@ -179,7 +182,7 @@ export function parseMe(md: string | null | undefined): Me {
     return { title: d.title, note: d.note, fields }
   })
   for (const s of doc.sections) if (!def(s.title) && !sectionBlank(s)) extras.push({ title: s.title, text: wholeText(s) })
-  const all = groups.flatMap((g) => g.fields)
+  const all = groups.flatMap((g) => g.fields).filter((f) => !f.optional)
   return { updated: getMeta(md ?? '', 'updated'), groups, extras, filled: all.filter((f) => f.text).length, total: all.length }
 }
 

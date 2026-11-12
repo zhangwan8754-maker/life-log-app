@@ -109,7 +109,7 @@ function seedSample(gh) {
   seedV1(gh)
   gh.write(
     'me.md',
-    `---\nupdated: ${TODAY}\n---\n# 我是谁\n\n## 现在\n\n在读学生，大三，计算机专业，在上海。\n正在学运维和英语。\n\n## 在乎\n\n### 让我有劲的\n\n把一件事从头搭起来；看到设计得很美的东西。\n\n### 耗我的\n\n### 好的一天\n\n睡够了，学了一点新东西，和在乎的人说了话。\n\n## 方向\n\n### 这学期\n\n- 过英语六级\n- 做完一个能上线的小项目\n\n### 毕业时\n\n### 更远\n\n## 做法\n\n### 验证过的\n\n### 借来的\n\n「慢即是快」——还没试过，先记在这。\n\n## 还没想清楚\n`,
+    `---\nupdated: ${TODAY}\n---\n# 我是谁\n\n## 现在\n\n在读学生，大三，计算机专业，在上海。\n正在学运维和英语。\n\n## 在乎\n\n### 让我有劲的\n\n把一件事从头搭起来；看到设计得很美的东西。\n\n### 耗我的\n\n### 好的一天\n\n睡够了，学了一点新东西，和在乎的人说了话。\n\n## 方向\n\n### 这学期\n\n- 过英语六级\n- 做完一个能上线的小项目\n\n### 每周投入\n\n- 英语 6h\n- 写代码 8h\n- 读书 2h\n\n### 毕业时\n\n### 更远\n\n## 做法\n\n### 验证过的\n\n### 借来的\n\n「慢即是快」——还没试过，先记在这。\n\n## 还没想清楚\n`,
   )
   let r = 7
   const rnd = () => ((r = (r * 9301 + 49297) % 233280), r / 233280)
@@ -523,7 +523,7 @@ try {
     await sheet.locator('.sheet-sub', { hasText: '这学期结束时' }).waitFor()
     await sheet.locator('textarea.me-edit').fill('过四级\n做完一个 ops 小项目')
     await sheet.locator('.text-btn', { hasText: '完成' }).click()
-    await until(() => gh.read('me.md')?.includes('### 这学期\n\n过四级\n做完一个 ops 小项目\n\n### 毕业时'), '写入这学期')
+    await until(() => gh.read('me.md')?.includes('### 这学期\n\n过四级\n做完一个 ops 小项目\n\n### 每周投入\n\n### 毕业时'), '写入这学期')
     const md = gh.read('me.md')
     assert.match(md, new RegExp(`^---\\nupdated: ${TODAY}\\n---\\n# 我是谁\\n\\n## 现在\\n\\n## 在乎\\n\\n### 让我有劲的\\n`))
     assert.ok(md.includes('## 今年\n\n- 读完 24 本书'), '写过字的旧栏目保留')
@@ -635,6 +635,83 @@ try {
     assert.ok(clip.includes('- P1 睡够七小时的日子，精力分更高（成立）') && clip.includes('- P2 事情一多，先被推掉的是健身（观察中）'), '复盘上下文带上模式账本')
   })
 
+  await step('每周目标：在「数据」里设，按名称对上这一周实际的投入', async () => {
+    await page.goto(BASE + '#/stats')
+    await page.locator('.stats-page .group-empty', { hasText: '给每科定一个每周目标' }).waitFor()
+    await page.locator('.label-btn', { hasText: '设目标' }).click()
+    await sheet.locator('.sheet-head h2', { hasText: '每周目标' }).waitFor()
+    // 记过投入的名称可以直接点；也可以自己写一项
+    await sheet.locator('.target-add .chip', { hasText: '英语' }).click()
+    await sheet.locator('input[aria-label="英语每周几小时"]').fill('3')
+    await sheet.locator('.target-add .chip', { hasText: '加一项' }).click()
+    await sheet.locator('.target-row').nth(1).locator('input').first().fill('数学')
+    await sheet.locator('input[aria-label="数学每周几小时"]').fill('10')
+    await sheet.locator('.quick-bottom .hint', { hasText: '一周合计 13h' }).waitFor()
+    await sheet.locator('.text-btn', { hasText: '完成' }).click()
+    await until(() => gh.read('me.md')?.includes('### 每周投入\n\n- 英语 3h\n- 数学 10h\n\n### 毕业时'), '目标写进 me.md')
+    const hours = (name) => page.locator('.stats-page .target-bars li', { hasText: name }).locator('.spent-hours').innerText()
+    await page.locator('.stats-page .target-bars li').nth(1).waitFor()
+    assert.equal((await hours('英语')).replace(/\s+/g, ' '), '1.5h / 3h')
+    assert.equal((await hours('数学')).replace(/\s+/g, ' '), '0h / 10h')
+    assert.equal(await page.locator('.label-btn').innerText(), '改目标')
+    // 「今天」页只多一行；「我是谁」里点开的是同一个弹层；每周复盘的回顾里也有
+    await page.goto(BASE + '#/')
+    await until(async () => (await dayNotes.locator('.target-line .spent-line-items').innerText().catch(() => '')) === '英语 1.5h/3h · 数学 0h/10h', '今天页的本周目标')
+    await page.goto(BASE + '#/me')
+    await page.locator('.head-sub', { hasText: '已填 2 / 10' }).waitFor()
+    await page.locator('.me-row.tap', { hasText: '每周投入' }).click()
+    await sheet.locator('.target-row').nth(1).waitFor()
+    assert.equal(await sheet.locator('.target-row').count(), 2)
+    await sheet.locator('button[aria-label="去掉数学"]').click()
+    await sheet.locator('.text-btn', { hasText: '完成' }).click()
+    await until(() => gh.read('me.md')?.includes('### 每周投入\n\n- 英语 3h\n\n### 毕业时'), '去掉一项')
+    await page.goto(BASE + `#/week/${WEEK}`)
+    await page.locator('.target-bars li', { hasText: '英语' }).waitFor()
+    assert.equal(await page.locator('.target-bars li').count(), 1)
+  })
+
+  await step('计时：开始、结束，记成一笔投入；撤销、放弃、忘了结束', async () => {
+    await page.goto(BASE + '#/')
+    const card = page.locator('.timer-card')
+    await dayNotes.locator('.spent-btn').click()
+    assert.ok(await sheet.locator('.timer-start').isDisabled(), '没选名称不能开始')
+    await sheet.locator('.spent-names .chip', { hasText: '英语' }).click()
+    await sheet.locator('.timer-start').click()
+    await card.locator('.timer-name', { hasText: '英语' }).waitFor()
+    // 相当于过了 47 分钟；关掉页面再回来，计时还在走
+    await page.evaluate(() => {
+      const t = JSON.parse(localStorage.getItem('ll.timer'))
+      localStorage.setItem('ll.timer', JSON.stringify({ ...t, start: t.start - 47 * 60000 }))
+    })
+    await page.reload()
+    await card.locator('.timer-clock', { hasText: /^47:\d\d$/ }).waitFor()
+    await dayNotes.locator('.spent-btn').click()
+    await sheet.locator('.timer-note', { hasText: '正在给「英语」计时' }).waitFor()
+    await page.keyboard.press('Escape')
+    await card.locator('.btn', { hasText: '结束并记下' }).click()
+    await until(() => day().includes('投入：英语 47min'), '记成一笔投入')
+    await page.getByText('已记下 英语 47 分钟').waitFor()
+    assert.equal(await card.count(), 0)
+    // 撤销：删掉那一笔，接着计时
+    await page.locator('.toast button', { hasText: '撤销' }).click()
+    await until(() => !day().includes('47min'), '撤销后那一笔没了')
+    await card.locator('.timer-clock', { hasText: /^47:\d\d$/ }).waitFor()
+    await card.locator('.text-btn', { hasText: '放弃' }).click()
+    await until(async () => (await card.count()) === 0, '放弃后卡片消失')
+    assert.equal(await page.evaluate(() => localStorage.getItem('ll.timer')), null)
+    // 忘了结束（过了 13 小时）：不直接记，先问实际学了多久
+    await page.evaluate(() => localStorage.setItem('ll.timer', JSON.stringify({ name: '数学', start: Date.now() - 13 * 3600e3 })))
+    await page.reload()
+    await card.locator('.btn', { hasText: '结束并记下' }).click()
+    await sheet.locator('.sheet-head h2', { hasText: '这次学了多久' }).waitFor()
+    await sheet.locator('.sheet-sub', { hasText: '已经过了 13 小时' }).waitFor()
+    await sheet.locator('input[aria-label=实际学了多少分钟]').fill('90')
+    await sheet.locator('.text-btn', { hasText: '记下' }).click()
+    await until(() => day().includes('投入：数学 1.5h'), '按填的时长记')
+    assert.ok(!day().includes('780min'))
+    assert.equal(await card.count(), 0)
+  })
+
   await step('手机上切换「待办 / 速记」：焦点留在输入框，弹层高度不变', async () => {
     const gh2 = new FakeGitHub()
     seedV1(gh2)
@@ -674,7 +751,7 @@ try {
     await page.locator('.journal-card.has').waitFor()
     await dayNotes.locator('.note-row').nth(4).waitFor()
     assert.equal(await dayNotes.locator('.note-row').count(), 5)
-    await dayNotes.locator('.spent-line', { hasText: '英语 1.5h' }).waitFor()
+    await dayNotes.locator('.spent-line:not(.target-line)', { hasText: '英语 1.5h' }).waitFor()
   })
 
   assert.deepEqual(errors, [], '页面没有报错')
@@ -749,6 +826,9 @@ try {
       for (const scheme of ['light', 'dark']) {
         const { ctx: c, page: p, errors: errs } = await newPage(sample, { ...opts, colorScheme: scheme })
         await connect(p)
+        // 「今天」页上有一段正在走的计时
+        await p.evaluate(() => localStorage.setItem('ll.timer', JSON.stringify({ name: '英语', start: Date.now() - 47 * 60000 - 12000 })))
+        await p.reload()
         for (const [tab, hash] of pages) {
           await p.goto(BASE + hash)
           await p.waitForTimeout(tab === 'review' || tab === 'stats' || tab.startsWith('memory') || tab.startsWith('advice') ? 1200 : 600)
@@ -803,6 +883,22 @@ try {
         await p.locator('.me-row.tap', { hasText: '耗我的' }).click()
         await p.waitForTimeout(450)
         await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-me-edit.png`, import.meta.url).pathname })
+        await p.keyboard.press('Escape')
+        await p.waitForTimeout(300)
+        // 「今天」页的本周目标一行；计时中的投入弹层；每周目标弹层
+        await p.goto(BASE + '#/')
+        await p.waitForTimeout(500)
+        await p.locator('.day-notes').scrollIntoViewIfNeeded()
+        await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-today-notes.png`, import.meta.url).pathname })
+        await p.locator('.day-notes .spent-btn').click()
+        await p.waitForTimeout(450)
+        await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-spent-timing.png`, import.meta.url).pathname })
+        await p.keyboard.press('Escape')
+        await p.waitForTimeout(300)
+        await p.goto(BASE + '#/stats')
+        await p.locator('.label-btn').click()
+        await p.waitForTimeout(450)
+        await p.screenshot({ path: new URL(`./shots/${name}-${scheme}-targets.png`, import.meta.url).pathname })
         await p.keyboard.press('Escape')
         await p.waitForTimeout(300)
         assert.deepEqual(errs, [], `${name} ${scheme} 页面没有报错`)

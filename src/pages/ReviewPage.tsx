@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks'
+import * as A from '../lib/actions'
 import { addDays, cnMonthDay } from '../lib/dates'
 import { dayMd, useFile, useStore, useToday, useTree } from '../lib/hooks'
 import { fmtHours, getMeta, score } from '../lib/md'
@@ -12,6 +13,7 @@ import { ListRow, Tabs } from '../components/Controls'
 import { Icon } from '../components/Icon'
 import { Empty, Page } from '../components/Page'
 import { SpentBars } from '../components/Spent'
+import { TargetBars } from '../components/Targets'
 import { useAdvisors } from './AdvicePage'
 
 /** 一行四个数字 */
@@ -54,7 +56,7 @@ export function ReviewPage() {
   const all = useAdvisors()
 
   const r = weekOf(today)
-  const stats = weekStats(r, dayMd, todo, today)
+  const stats = weekStats(r, dayMd, todo, today, me)
   const done = s.read(reviewPath(r))
   const prev = prevWeek(r)
   const prevMissing = s.treeLoaded && today <= addDays(r.from, 1) && !s.read(reviewPath(prev))
@@ -124,9 +126,10 @@ export function StatsPage() {
   const todo = useFile('todo.md') ?? ''
   const [metric, setMetric] = useState<Metric>('mood')
   const [year, setYear] = useState(Number(today.slice(0, 4)))
+  const me = useFile('me.md')
 
   const r = weekOf(today)
-  const stats = weekStats(r, dayMd, todo, today)
+  const stats = weekStats(r, dayMd, todo, today, me)
   const last30 = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29))
   const series = (k: Metric) => last30.map((d) => score(getMeta(dayMd(d) ?? '', k)))
   const hasTrend = series('mood').some((v) => v !== null) || series('energy').some((v) => v !== null)
@@ -135,6 +138,15 @@ export function StatsPage() {
     <Page title="数据" icon="chart" back={{ href: '#/review', label: '复盘' }} class="stats-page">
       <p class="group-label">本周</p>
       <Stats s={stats} />
+      <p class="group-label label-bar">
+        <span>本周目标</span>
+        <button type="button" class="text-btn small label-btn" onClick={() => A.targetSheet.set(true)}>
+          {stats.targets.length ? '改目标' : '设目标'}
+        </button>
+      </p>
+      <div class="group spent-group">
+        {stats.targets.length ? <TargetBars items={stats.targets} /> : <p class="group-empty">给每科定一个每周目标，比如数学 10 小时。这里会显示这一周实际投入了多少。</p>}
+      </div>
       {stats.spent.length > 0 && (
         <>
           <p class="group-label label-bar">

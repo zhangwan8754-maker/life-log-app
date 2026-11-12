@@ -1,5 +1,6 @@
 /** 任务相关的用户动作 + 全局弹层状态 */
 import { dayPath, hm, ymd } from './dates'
+import { fmtMinutes } from './md'
 import { store } from './store'
 import { INBOX, type Task } from './todo'
 import { Box, haptic, toast } from './ui'
@@ -98,3 +99,84 @@ export function addNote(date: string, text: string) {
 /** 「记一笔投入」弹层：记到哪一天 */
 export const spentSheet = new Box<{ date: string } | null>(null)
 
+/** 「每周目标」弹层 */
+export const targetSheet = new Box(false)
+
+// ───── 计时：开始 → 结束，自动记成一笔投入 ─────
+// 只存在这台设备上（localStorage）；关掉页面也在走，因为记的是开始的时刻。
+
+export interface Timer {
+  name: string
+  /** 开始的时刻，毫秒 */
+  start: number
+}
+const TIMER_KEY = 'll.timer'
+/** 超过这么久，多半是忘了结束：先问实际学了多久，不直接记 */
+export const LONG_TIMER_MIN = 240
+
+function loadTimer(): Timer | null {
+  try {
+    const t = JSON.parse(localStorage.getItem(TIMER_KEY) ?? 'null')
+    return t && typeof t.name === 'string' && typeof t.start === 'number' ? { name: t.name, start: t.start } : null
+  } catch {
+    return null
+  }
+}
+export const timer = new Box<Timer | null>(loadTimer())
+/** 计时太久时弹出来确认的那一次 */
+export const timerStop = new Box<Timer | null>(null)
+
+function setTimer(t: Timer | null) {
+  timer.set(t)
+  try {
+    if (t) localStorage.setItem(TIMER_KEY, JSON.stringify(t))
+    else localStorage.removeItem(TIMER_KEY)
+  } catch {}
+}
+// 另一个标签页里开始或结束了计时
+if (typeof addEventListener === 'function')
+  addEventListener('storage', (e) => {
+    if (e.key === TIMER_KEY) timer.set(loadTimer())
+  })
+
+export const timerMinutes = (t: Timer, now = Date.now()) => Math.max(0, Math.round((now - t.start) / 60000))
+/** 47 → 47 分钟，125 → 2 小时 5 分 */
+export const minutesLabel = (min: number) => (min < 60 ? `${min} 分钟` : `${Math.floor(min / 60)} 小时${min % 60 ? ` ${min % 60} 分` : ''}`)
+
+export function startTimer(name: string) {
+  setTimer({ name, start: Date.now() })
+  haptic(10)
+}
+
+/** 结束计时，记成今天的一笔投入；撤销会删掉这一笔并接着计时 */
+export function logTimer(t: Timer, min: number) {
+  setTimer(null)
+  if (min < 1) return toast('不到 1 分钟，没有记下', { label: '继续计时', run: () => setTimer(t) })
+  const date = ymd()
+  const time = hm()
+  const text = `投入：${t.name} ${fmtMinutes(min)}`
+  store.enqueue(dayPath(date), { kind: 'note', date, time, text })
+  haptic(10)
+  toast(`已记下 ${t.name} ${minutesLabel(min)}`, {
+    label: '撤销',
+    run: () => {
+      store.enqueue(dayPath(date), { kind: 'note.delete', date, time, text })
+      setTimer(t)
+    },
+  })
+}
+
+export function stopTimer() {
+  const t = timer.value
+  if (!t) return
+  const min = timerMinutes(t)
+  if (min >= LONG_TIMER_MIN) timerStop.set(t)
+  else logTimer(t, min)
+}
+
+export function discardTimer() {
+  const t = timer.value
+  if (!t) return
+  setTimer(null)
+  toast('已放弃这次计时', { label: '撤销', run: () => setTimer(t) })
+}
